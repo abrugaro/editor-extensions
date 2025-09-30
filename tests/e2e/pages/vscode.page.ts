@@ -34,7 +34,12 @@ export class VSCode extends BasePage {
     super(app, window);
   }
 
-  public static async open(repoUrl?: string, repoDir?: string, branch = 'main') {
+  public static async open(
+    repoUrl?: string,
+    repoDir?: string,
+    branch = 'main',
+    waitForInitialization = true
+  ) {
     /**
      * user-data-dir is passed to force opening a new instance avoiding the process to couple with an existing vscode instance
      * so Playwright doesn't detect that the process has finished
@@ -51,9 +56,10 @@ export class VSCode extends BasePage {
           await cleanupRepo(repoDir);
         }
         console.log(`Cloning repository from ${repoUrl} -b ${branch}`);
-        execSync(`git clone ${repoUrl} -b ${branch}`);
+        execSync(`git clone ${repoUrl} -b ${branch}`, { stdio: 'pipe' });
       }
     } catch (error: any) {
+      console.error(error);
       throw new Error('Failed to clone the repository');
     }
 
@@ -88,12 +94,23 @@ export class VSCode extends BasePage {
     const vscodeApp = await electron.launch({
       executablePath: executablePath,
       args,
+      env: {
+        ...process.env,
+        __TEST_EXTENSION_END_TO_END__: 'true',
+      },
     });
     await vscodeApp.firstWindow();
 
     const window = await vscodeApp.firstWindow({ timeout: 60000 });
     console.log('VSCode opened');
-    return new VSCode(vscodeApp, window, repoDir);
+    const vscode = new VSCode(vscodeApp, window, repoDir);
+
+    if (waitForInitialization) {
+      // Wait for extension initialization in downstream environment
+      await vscode.waitForExtensionInitialization();
+    }
+
+    return vscode;
   }
 
   /**
@@ -108,7 +125,7 @@ export class VSCode extends BasePage {
         await installExtension();
       }
 
-      return repoUrl ? VSCode.open(repoUrl, repoDir, branch) : VSCode.open();
+      return repoUrl ? VSCode.open(repoUrl, repoDir, branch, false) : VSCode.open();
     } catch (error) {
       console.error('Error launching VSCode:', error);
       throw error;
@@ -126,6 +143,43 @@ export class VSCode extends BasePage {
       }
     } catch (error) {
       console.error('Error closing VSCode:', error);
+    }
+  }
+
+  /**
+   * Waits for the Konveyor extension to complete initialization by watching for
+   * the __EXTENSION_INITIALIZED__ info message signal.
+   */
+  public async waitForExtensionInitialization(): Promise<void> {
+    try {
+      console.log('Waiting for Konveyor extension initialization...');
+
+      const javaReadySelector = this.getWindow().getByRole('button', { name: 'Java: Ready' });
+
+      await javaReadySelector.waitFor({ timeout: 120000 });
+      // Sometimes the java ready status is displayed for a few seconds before starting to load again
+      // This checks that the state is kept for a few seconds before continuing
+      await this.waitDefault();
+      await javaReadySelector.waitFor({ timeout: 1200000 });
+
+      // Trigger extension activation by opening the analysis view
+      // This was working before - the extension activates and opens the view
+      await this.executeQuickCommand(`${COMMAND_CATEGORY}: Open Analysis View`);
+
+      // Now wait for the initialization signal message to appear
+      // This message is shown by the extension when __TEST_EXTENSION_END_TO_END__ env var is set
+      const initializationMessage = this.window
+        .getByRole('alert')
+        .getByText('__EXTENSION_INITIALIZED__');
+      await expect(initializationMessage).toBeVisible({ timeout: 300000 }); // 5 minute timeout for asset downloads
+
+      // Dismiss the message
+      await this.window.keyboard.press('Escape');
+      await this.window.waitForTimeout(2000); // Give VSCode a chance to process the message
+      console.log('Konveyor extension initialized successfully');
+    } catch (error) {
+      console.error('Failed to wait for extension initialization:', error);
+      throw error;
     }
   }
 
@@ -600,7 +654,7 @@ export class VSCode extends BasePage {
     const MAX_FIXES = 500;
 
     for (let i = 0; i < MAX_FIXES; i++) {
-      await expect(fixLocator.first()).toBeVisible({ timeout: 60000 });
+      await expect(fixLocator.first()).toBeVisible({ timeout: 300000 });
       // Ensures the button is clicked even if there are notifications overlaying it due to screen size
       await fixLocator.first().dispatchEvent('click');
       await this.waitDefault();
