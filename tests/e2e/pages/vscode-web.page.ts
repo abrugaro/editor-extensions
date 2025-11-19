@@ -29,6 +29,7 @@ export class VSCodeWeb extends VSCode {
     const context = await browser.newContext({
       ignoreHTTPSErrors: true,
       storageState: './web-state.json',
+      permissions: ['clipboard-write', 'clipboard-read'],
     });
 
     const page = await context.newPage();
@@ -119,7 +120,10 @@ export class VSCodeWeb extends VSCode {
       );
     }
     const browser = await chromium.launch();
-    const contextOptions: BrowserContextOptions = { ignoreHTTPSErrors: true };
+    const contextOptions: BrowserContextOptions = {
+      ignoreHTTPSErrors: true,
+      permissions: ['clipboard-write', 'clipboard-read'],
+    };
     if (existsSync('./web-state.json')) {
       contextOptions.storageState = './web-state.json';
     }
