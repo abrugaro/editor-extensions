@@ -1,6 +1,7 @@
 import { expect, Page } from '@playwright/test';
 import { OutputChannel } from '../enums/output.enum';
 import { VSCode } from './vscode.page';
+import { SCREENSHOTS_FOLDER } from '../utilities/consts';
 
 export class OutputPanel {
   private static instance: OutputPanel;
@@ -71,6 +72,13 @@ export class OutputPanel {
     await this.openOutputView(channel, filterText);
 
     await this.window.locator('div.view-lines').first().waitFor({ state: 'visible' });
+    await this.window.waitForFunction(
+      () => {
+        const element = document.querySelector('div.view-lines');
+        return element && element.textContent && element.textContent.trim().length > 0;
+      },
+      { timeout: 10000 }
+    );
 
     const rawContent = await this.window.locator('div.view-lines').first().textContent();
 
