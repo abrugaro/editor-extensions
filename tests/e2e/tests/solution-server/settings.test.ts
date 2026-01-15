@@ -5,13 +5,13 @@ import { extensionName } from '../../utilities/utils';
 import { OPENAI_GPT4O_PROVIDER } from '../../fixtures/provider-configs.fixture';
 import * as VSCodeFactory from '../../utilities/vscode.factory';
 
-const SOLUTION_SERVER_URL = process.env.SOLUTION_SERVER_URL;
-const SOLUTION_SERVER_REALM = process.env.SOLUTION_SERVER_REALM ?? 'tackle';
-const SOLUTION_SERVER_USERNAME = process.env.SOLUTION_SERVER_USERNAME ?? 'admin';
-const SOLUTION_SERVER_PASSWORD = process.env.SOLUTION_SERVER_PASSWORD ?? 'Dog8code';
+const HUB_URL = process.env.HUB_URL;
+const HUB_REALM = process.env.HUB_REALM ?? 'tackle';
+const HUB_USERNAME = process.env.HUB_USERNAME ?? 'admin';
+const HUB_PASSWORD = process.env.HUB_PASSWORD ?? 'Dog8code';
 
-if (!SOLUTION_SERVER_URL) {
-  throw new Error('SOLUTION_SERVER_URL environment variable is required');
+if (!HUB_URL) {
+  throw new Error('HUB_URL environment variable is required');
 }
 
 type SolutionServerConfig = {
@@ -58,11 +58,11 @@ const solutionServerConfigs: SolutionServerConfig[] = [
 const buildSettings = (config: SolutionServerConfig) => ({
   [`${extensionName}.solutionServer`]: {
     enabled: config.ssEnabled,
-    url: SOLUTION_SERVER_URL,
+    url: HUB_URL,
     auth: {
       enabled: config.authInIDE,
       insecure: config.insecure,
-      realm: config.realm ?? SOLUTION_SERVER_REALM,
+      realm: config.realm ?? HUB_REALM,
     },
   },
 });
@@ -78,10 +78,7 @@ test.describe(`Configure Solution Server settings`, () => {
     await vscodeApp.configureGenerativeAI(OPENAI_GPT4O_PROVIDER.config);
     await vscodeApp.openWorkspaceSettingsAndWrite(buildSettings(solutionServerConfigs[0]));
     await vscodeApp.waitDefault();
-    await vscodeApp.configureSolutionServerCredentials(
-      SOLUTION_SERVER_USERNAME,
-      SOLUTION_SERVER_PASSWORD
-    );
+    await vscodeApp.configureSolutionServerCredentials(HUB_USERNAME, HUB_PASSWORD);
     await vscodeApp.startServer();
   });
 
