@@ -66,6 +66,9 @@ test.describe(
     });
 
     test.afterAll(async () => {
+      if (!vscodeApp) {
+        return;
+      }
       const hubPage = await HubConfigurationPage.open(vscodeApp);
       await hubPage.fillForm({
         ...getHubConfig(),
