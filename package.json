@@ -1,0 +1,14 @@
+{
+  "name": "mta-vscode-extension-builder",
+  "version": "8.0.0",
+  "private": true,
+  "description": "Build orchestrator for MTA VSCode extension based on release-0.2",
+  "scripts": {
+    "pull-upstream": "node scripts/pull-upstream.js",
+    "update-upstream": "./scripts/update-upstream.sh",
+    "clean": "rm -rf .upstream-workspace"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0"
+  }
+}

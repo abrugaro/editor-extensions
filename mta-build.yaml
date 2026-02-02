@@ -1,0 +1,39 @@
+upstream:
+  repository: konveyor/editor-extensions
+  # Will be updated to specific SHA from release-0.2 branch
+  ref: 7205d4fed6824e58f6b021c14e6ca3a7c42c3f4a
+  semanticRef: release-0.2
+
+branding:
+  version: "8.0.0"
+  publisher: redhat
+  author: Red Hat
+  repository: https://github.com/migtools/editor-extensions
+  bugs: https://github.com/migtools/editor-extensions/issues
+  homepage: https://developers.redhat.com/products/mta/overview
+
+extension:
+  # Single extension configuration for release-0.2 architecture
+  enabled: true
+  name: mta-vscode-extension
+  displayName: Migration Toolkit for Applications
+  description: Migration Toolkit for Applications - Analyze applications for migration
+
+  # Runtime assets configuration (optional)
+  runtimeAssets:
+    enabled: false  # Bundle assets by default
+    baseUrl: https://developers.redhat.com/content-gateway/rest/browse/pub/mta/8.0.0/
+
+assets:
+  # MTA-specific assets to overlay on upstream
+  - from: assets/icons/mta-icon.png
+    to: vscode/resources/icon.png
+  - from: assets/README.md
+    to: vscode/README.md
+
+# Transform konveyor namespace to mta-vscode-extension for release-0.2
+transforms:
+  namespaceFrom: konveyor
+  namespaceTo: mta-vscode-extension
+  categoryFrom: Konveyor
+  categoryTo: MTA
