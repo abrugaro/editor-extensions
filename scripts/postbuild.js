@@ -1,306 +1,281 @@
 #!/usr/bin/env node
-/**
- * MTA postbuild verification script
- * Comprehensive validation that MTA branding was applied correctly
- * Based on proven logic from migtools/editor-extensions
- */
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { extensionName, extensionShortName, extensionVersion } from "./prebuild.js";
 
-// ES module equivalent of __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootDir = path.join(__dirname, "..");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Expected MTA values
-const expectedExtensionName = "mta-vscode-extension";
-const expectedPublisher = "redhat";
-const expectedAuthor = "Red Hat";
-const expectedCategory = "MTA";
+console.log(`🔍 Running postbuild for ${extensionName}...`);
 
-let errors = [];
-let warnings = [];
+// First, update all workspace versions
+console.log(`📝 Updating all package.json versions to ${extensionVersion}...`);
 
-function addError(message) {
-  errors.push(message);
-  console.error(`❌ ${message}`);
-}
+const workspaces = [
+  "../package.json",
+  "../extra-types/package.json",
+  "../shared/package.json",
+  "../webview-ui/package.json",
+  "../agentic/package.json",
+  "../vscode/package.json",
+];
 
-function addWarning(message) {
-  warnings.push(message);
-  console.warn(`⚠️  ${message}`);
-}
-
-function checkSuccess(message) {
-  console.log(`✅ ${message}`);
-}
-
-// Verify workspace version consistency
-function verifyVersionConsistency() {
-  console.log("🔍 Checking version consistency...");
-
-  const rootPackagePath = path.join(rootDir, "package.json");
-  const vsCodePackagePath = path.join(rootDir, "vscode", "package.json");
-
-  if (!fs.existsSync(rootPackagePath)) {
-    addError("Root package.json not found");
-    return;
-  }
-
-  if (!fs.existsSync(vsCodePackagePath)) {
-    addError("VSCode workspace package.json not found");
-    return;
-  }
-
-  const rootPackage = JSON.parse(fs.readFileSync(rootPackagePath, "utf8"));
-  const vsCodePackage = JSON.parse(fs.readFileSync(vsCodePackagePath, "utf8"));
-
-  if (rootPackage.version !== vsCodePackage.version) {
-    addError(`Version mismatch: root is ${rootPackage.version}, vscode workspace is ${vsCodePackage.version}`);
-  } else {
-    checkSuccess(`Version consistency: ${vsCodePackage.version}`);
+for (const workspacePath of workspaces) {
+  const fullPath = path.join(__dirname, workspacePath);
+  if (fs.existsSync(fullPath)) {
+    const workspacePackage = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+    workspacePackage.version = extensionVersion;
+    fs.writeFileSync(fullPath, JSON.stringify(workspacePackage, null, 2));
+    console.log(`  ✅ Updated ${workspacePath}`);
   }
 }
 
-// Verify core extension branding
-function verifyExtensionBranding() {
-  console.log("🔍 Checking extension branding...");
+console.log(`📝 Version updates complete!`);
 
-  const packagePath = path.join(rootDir, "vscode", "package.json");
-  const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+console.log(`🔍 Running postbuild verification for ${extensionName}...`);
 
-  // Check basic branding
-  if (packageJson.name !== expectedExtensionName) {
-    addError(`Extension name is "${packageJson.name}", expected "${expectedExtensionName}"`);
-  } else {
-    checkSuccess(`Extension name: ${packageJson.name}`);
-  }
+// Read the final package.json to verify branding was applied
+const packagePath = path.join(__dirname, "../vscode/package.json");
+const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
 
-  if (packageJson.publisher !== expectedPublisher) {
-    addError(`Publisher is "${packageJson.publisher}", expected "${expectedPublisher}"`);
-  } else {
-    checkSuccess(`Publisher: ${packageJson.publisher}`);
-  }
+const errors = [];
+const warnings = [];
 
-  if (packageJson.author !== expectedAuthor) {
-    addError(`Author is "${packageJson.author}", expected "${expectedAuthor}"`);
-  } else {
-    checkSuccess(`Author: ${packageJson.author}`);
-  }
+// Verify core package properties
+console.log("🔍 Verifying core package properties...");
 
-  // Check display name contains MTA
-  if (!packageJson.displayName?.toLowerCase().includes('migration')) {
-    addError(`Display name "${packageJson.displayName}" should contain "migration"`);
-  } else {
-    checkSuccess(`Display name: ${packageJson.displayName}`);
-  }
+if (packageJson.name !== extensionName) {
+  errors.push(`Expected name: ${extensionName}, got: ${packageJson.name}`);
+} else {
+  console.log(`  ✅ Package name: ${packageJson.name}`);
+}
 
-  // Check repository URL
-  if (!packageJson.repository?.url?.includes('migtools/editor-extensions')) {
-    addError(`Repository URL should point to migtools/editor-extensions`);
-  } else {
-    checkSuccess(`Repository: ${packageJson.repository.url}`);
-  }
+if (packageJson.displayName !== "Migration toolkit for applications") {
+  errors.push(
+    `Expected displayName: "Migration toolkit for applications", got: ${packageJson.displayName}`,
+  );
+} else {
+  console.log(`  ✅ Display name: ${packageJson.displayName}`);
+}
+
+if (packageJson.publisher !== "redhat") {
+  errors.push(`Expected publisher: "redhat", got: ${packageJson.publisher}`);
+} else {
+  console.log(`  ✅ Publisher: ${packageJson.publisher}`);
+}
+
+if (packageJson.author !== "Red Hat") {
+  errors.push(`Expected author: "Red Hat", got: ${packageJson.author}`);
+} else {
+  console.log(`  ✅ Author: ${packageJson.author}`);
+}
+
+if (!packageJson.description.includes("Migration toolkit for applications (MTA)")) {
+  errors.push(`Description should include "Migration toolkit for applications (MTA)"`);
+} else {
+  console.log(`  ✅ Description includes proper branding`);
+}
+
+// Verify repository URLs
+console.log("🔍 Verifying repository URLs...");
+
+if (packageJson.repository?.url !== "https://github.com/migtools/editor-extensions") {
+  errors.push(
+    `Expected repository URL: "https://github.com/migtools/editor-extensions", got: ${packageJson.repository?.url}`,
+  );
+} else {
+  console.log(`  ✅ Repository URL: ${packageJson.repository.url}`);
+}
+
+if (packageJson.bugs !== "https://github.com/migtools/editor-extensions/issues") {
+  errors.push(
+    `Expected bugs URL: "https://github.com/migtools/editor-extensions/issues", got: ${packageJson.bugs}`,
+  );
+} else {
+  console.log(`  ✅ Bugs URL: ${packageJson.bugs}`);
 }
 
 // Verify commands have correct branding
-function verifyCommands() {
-  console.log("🔍 Checking command branding...");
+console.log("🔍 Verifying command branding...");
 
-  const packagePath = path.join(rootDir, "vscode", "package.json");
-  const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+const commands = packageJson.contributes?.commands || [];
+let commandErrors = 0;
 
-  if (!packageJson.contributes?.commands) {
-    addWarning("No commands found to verify");
-    return;
+commands.forEach((cmd, index) => {
+  if (!cmd.command.startsWith(`${extensionName}.`)) {
+    errors.push(`Command ${index} has incorrect prefix: ${cmd.command}`);
+    commandErrors++;
   }
 
-  let commandErrors = 0;
-  packageJson.contributes.commands.forEach((cmd, index) => {
-    if (!cmd.command?.startsWith(`${expectedExtensionName}.`)) {
-      addError(`Command[${index}] "${cmd.command}" should start with "${expectedExtensionName}."`);
-      commandErrors++;
-    }
-
-    if (cmd.category && cmd.category !== expectedCategory && cmd.category !== "View") {
-      addError(`Command[${index}] category "${cmd.category}" should be "${expectedCategory}" (or "View")`);
-      commandErrors++;
-    }
-  });
-
-  if (commandErrors === 0) {
-    checkSuccess(`${packageJson.contributes.commands.length} commands properly branded`);
+  if (cmd.category !== extensionShortName && cmd.category !== "diffEditor") {
+    errors.push(
+      `Command ${index} has incorrect category: ${cmd.category} (expected: ${extensionShortName} or diffEditor)`,
+    );
+    commandErrors++;
   }
+});
+
+if (commandErrors === 0) {
+  console.log(`  ✅ All ${commands.length} commands properly branded`);
+} else {
+  console.log(`  ❌ Found ${commandErrors} command branding issues`);
 }
 
 // Verify configuration properties
-function verifyConfiguration() {
-  console.log("🔍 Checking configuration branding...");
+console.log("🔍 Verifying configuration properties...");
 
-  const packagePath = path.join(rootDir, "vscode", "package.json");
-  const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+const configProps = packageJson.contributes?.configuration?.properties || {};
+const propKeys = Object.keys(configProps);
+let configErrors = 0;
 
-  if (!packageJson.contributes?.configuration) {
-    addWarning("No configuration found to verify");
-    return;
+propKeys.forEach((key) => {
+  if (!key.startsWith(`${extensionName}.`)) {
+    errors.push(`Configuration property has incorrect prefix: ${key}`);
+    configErrors++;
   }
+});
 
-  const configs = Array.isArray(packageJson.contributes.configuration)
-    ? packageJson.contributes.configuration
-    : [packageJson.contributes.configuration];
+if (configErrors === 0) {
+  console.log(`  ✅ All ${propKeys.length} configuration properties properly branded`);
+} else {
+  console.log(`  ❌ Found ${configErrors} configuration property branding issues`);
+}
 
-  let configErrors = 0;
-  configs.forEach((config, configIndex) => {
-    if (config.properties) {
-      Object.keys(config.properties).forEach((prop) => {
-        if (!prop.startsWith(`${expectedExtensionName}.`)) {
-          addError(`Config property "${prop}" should start with "${expectedExtensionName}."`);
-          configErrors++;
-        }
-      });
-    }
-  });
-
-  if (configErrors === 0) {
-    checkSuccess("Configuration properties properly branded");
-  }
+if (packageJson.contributes?.configuration?.title !== extensionShortName) {
+  errors.push(
+    `Configuration title should be: ${extensionShortName}, got: ${packageJson.contributes?.configuration?.title}`,
+  );
+} else {
+  console.log(`  ✅ Configuration title: ${packageJson.contributes.configuration.title}`);
 }
 
 // Verify views and containers
-function verifyViews() {
-  console.log("🔍 Checking view branding...");
+console.log("🔍 Verifying views and containers...");
 
-  const packagePath = path.join(rootDir, "vscode", "package.json");
-  const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
-
-  // Check view containers
-  if (packageJson.contributes?.viewsContainers?.activitybar) {
-    const containers = packageJson.contributes.viewsContainers.activitybar;
-    let containerErrors = 0;
-
-    containers.forEach((container, index) => {
-      if (container.id !== expectedExtensionName) {
-        addError(`View container[${index}] id "${container.id}" should be "${expectedExtensionName}"`);
-        containerErrors++;
-      }
-      if (container.title !== expectedCategory) {
-        addError(`View container[${index}] title "${container.title}" should be "${expectedCategory}"`);
-        containerErrors++;
-      }
-    });
-
-    if (containerErrors === 0) {
-      checkSuccess("View containers properly branded");
-    }
+const activitybar = packageJson.contributes?.viewsContainers?.activitybar || [];
+activitybar.forEach((container, index) => {
+  if (container.id !== extensionName) {
+    errors.push(`Activity bar container ${index} has incorrect id: ${container.id}`);
   }
-
-  // Check views
-  if (packageJson.contributes?.views) {
-    let viewErrors = 0;
-    Object.keys(packageJson.contributes.views).forEach((containerKey) => {
-      if (!containerKey.includes(expectedExtensionName)) {
-        addError(`View container key "${containerKey}" should include "${expectedExtensionName}"`);
-        viewErrors++;
-      }
-
-      const views = packageJson.contributes.views[containerKey];
-      views.forEach((view, index) => {
-        if (!view.id?.startsWith(`${expectedExtensionName}.`)) {
-          addError(`View[${index}] id "${view.id}" should start with "${expectedExtensionName}."`);
-          viewErrors++;
-        }
-      });
-    });
-
-    if (viewErrors === 0) {
-      checkSuccess("Views properly branded");
-    }
+  if (container.title !== extensionShortName) {
+    errors.push(`Activity bar container ${index} has incorrect title: ${container.title}`);
   }
-}
-
-// Verify assets exist
-function verifyAssets() {
-  console.log("🔍 Checking branded assets...");
-
-  const iconPath = path.join(rootDir, "vscode", "resources", "icon.png");
-  const avatarPath = path.join(rootDir, "webview-ui", "public", "avatarIcons", "avatar.svg");
-  const readmePath = path.join(rootDir, "vscode", "README.md");
-
-  if (fs.existsSync(iconPath)) {
-    checkSuccess("VSCode sidebar icon found");
-  } else {
-    addWarning("VSCode sidebar icon not found");
-  }
-
-  if (fs.existsSync(avatarPath)) {
-    checkSuccess("Webview avatar found");
-  } else {
-    addWarning("Webview avatar not found");
-  }
-
-  if (fs.existsSync(readmePath)) {
-    checkSuccess("README found");
-  } else {
-    addWarning("README not found");
-  }
-}
-
-// Main execution
-function main() {
-  console.log("🔍 Running postbuild verification for MTA extension...");
-  console.log();
-
-  try {
-    verifyVersionConsistency();
-    verifyExtensionBranding();
-    verifyCommands();
-    verifyConfiguration();
-    verifyViews();
-    verifyAssets();
-
-    console.log();
-    console.log("📊 Verification Summary:");
-    console.log(`   Errors: ${errors.length}`);
-    console.log(`   Warnings: ${warnings.length}`);
-
-    if (errors.length > 0) {
-      console.log();
-      console.error("❌❌❌ POSTBUILD VERIFICATION FAILED ❌❌❌");
-      console.error("❌ Build cannot continue with branding errors");
-      console.error("❌❌❌ Fix the above errors and rebuild ❌❌❌");
-      process.exit(1);
-    } else {
-      console.log();
-      console.log("✅ All verifications passed! Extension properly branded for MTA.");
-      if (warnings.length > 0) {
-        console.log("⚠️  Note: Some warnings were found but they won't block the build.");
-      }
-    }
-  } catch (error) {
-    console.error("❌❌❌ FATAL: Postbuild verification crashed ❌❌❌");
-    console.error("❌ Error:", error.message);
-    console.error("❌ Stack:", error.stack);
-    process.exit(1);
-  }
-}
-
-// Process-level error handling
-process.on('uncaughtException', (error) => {
-  console.error('❌❌❌ FATAL: Uncaught exception in postbuild:', error.message);
-  console.error(error.stack);
-  process.exit(1);
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌❌❌ FATAL: Unhandled promise rejection in postbuild:', reason);
-  process.exit(1);
-});
-
-// Only run if called directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
+if (activitybar.length > 0) {
+  console.log(`  ✅ Activity bar containers properly branded`);
 }
 
-export { main as verifyMTABranding };
+// Verify views
+const views = packageJson.contributes?.views || {};
+Object.keys(views).forEach((viewKey) => {
+  if (viewKey !== extensionName) {
+    errors.push(`View container key should be: ${extensionName}, got: ${viewKey}`);
+  }
+
+  views[viewKey].forEach((view, index) => {
+    if (!view.id.startsWith(`${extensionName}.`)) {
+      errors.push(`View ${index} has incorrect id prefix: ${view.id}`);
+    }
+  });
+});
+
+console.log(`  ✅ Views properly branded`);
+
+// Verify menus
+console.log("🔍 Verifying menus...");
+
+const menus = packageJson.contributes?.menus || {};
+Object.keys(menus).forEach((menuKey) => {
+  if (
+    menuKey.includes(".") &&
+    !menuKey.startsWith(`${extensionName}.`) &&
+    !menuKey.startsWith("view/") &&
+    !menuKey.startsWith("explorer/") &&
+    !menuKey.startsWith("commandPalette")
+  ) {
+    warnings.push(`Menu key might need branding: ${menuKey}`);
+  }
+});
+
+console.log(`  ✅ Menus verified`);
+
+// Verify submenus
+const submenus = packageJson.contributes?.submenus || [];
+submenus.forEach((submenu, index) => {
+  if (!submenu.id.startsWith(extensionName)) {
+    errors.push(`Submenu ${index} has incorrect id: ${submenu.id}`);
+  }
+  if (!submenu.label.includes(extensionShortName)) {
+    errors.push(
+      `Submenu ${index} label should include: ${extensionShortName}, got: ${submenu.label}`,
+    );
+  }
+});
+
+if (submenus.length > 0) {
+  console.log(`  ✅ Submenus properly branded`);
+}
+
+// Verify fallback assets exist
+console.log("🔍 Verifying fallback assets...");
+
+if (packageJson.fallbackAssets) {
+  const assets = packageJson.fallbackAssets.assets || {};
+  const platformCount = Object.keys(assets).length;
+
+  if (platformCount >= 6) {
+    console.log(`  ✅ Fallback assets configured for ${platformCount} platforms`);
+  } else {
+    warnings.push(`Only ${platformCount} platforms configured in fallback assets (expected 6)`);
+  }
+
+  if (packageJson.fallbackAssets.sha256sumFile !== "sha256sum.txt") {
+    warnings.push(
+      `sha256sumFile should be "sha256sum.txt", got: ${packageJson.fallbackAssets.sha256sumFile}`,
+    );
+  } else {
+    console.log(`  ✅ sha256sumFile properly configured`);
+  }
+} else {
+  warnings.push("No fallback assets configuration found");
+}
+
+// Verify README was copied
+console.log("🔍 Verifying README...");
+
+const readmePath = path.join(__dirname, "../vscode/README.md");
+if (fs.existsSync(readmePath)) {
+  const readmeContent = fs.readFileSync(readmePath, "utf8");
+  if (readmeContent.includes("Developer Lightspeed for migration toolkit")) {
+    console.log(`  ✅ README contains proper branding`);
+  } else {
+    errors.push("README does not contain proper branding");
+  }
+} else {
+  errors.push("README.md not found");
+}
+
+// Summary
+console.log("\n📊 Verification Summary:");
+console.log(`✅ Verified branding for extension: ${extensionName}`);
+console.log(`✅ Short name: ${extensionShortName}`);
+
+if (warnings.length > 0) {
+  console.log(`\n⚠️  Warnings (${warnings.length}):`);
+  warnings.forEach((warning, index) => {
+    console.log(`  ${index + 1}. ${warning}`);
+  });
+}
+
+if (errors.length > 0) {
+  console.log(`\n❌ Errors (${errors.length}):`);
+  errors.forEach((error, index) => {
+    console.log(`  ${index + 1}. ${error}`);
+  });
+  console.log("\n❌ Postbuild verification failed!");
+  process.exit(1);
+} else {
+  console.log(`\n✅ Postbuild verification passed! ${extensionName} is properly branded.`);
+}

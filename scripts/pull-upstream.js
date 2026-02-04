@@ -116,11 +116,11 @@ fs.copyFileSync(buildConfigPath, path.join(workspaceDir, "mta-build.yaml"));
 console.log("  ✅ Copied mta-build.yaml");
 
 // Copy MTA scripts to scripts/
-const applyBrandingSource = path.join(rootDir, "scripts/apply-branding.js");
-const applyBrandingTarget = path.join(workspaceDir, "scripts/apply-branding.js");
-if (fs.existsSync(applyBrandingSource)) {
-  fs.copyFileSync(applyBrandingSource, applyBrandingTarget);
-  console.log("  ✅ Copied apply-branding.js to scripts/");
+const prebuildSource = path.join(rootDir, "scripts/prebuild.js");
+const prebuildTarget = path.join(workspaceDir, "scripts/prebuild.js");
+if (fs.existsSync(prebuildSource)) {
+  fs.copyFileSync(prebuildSource, prebuildTarget);
+  console.log("  ✅ Copied prebuild.js to scripts/");
 }
 
 const postbuildSource = path.join(rootDir, "scripts/postbuild.js");
@@ -166,51 +166,6 @@ if (fs.existsSync(envCiSource)) {
   }
   fs.copyFileSync(envCiSource, envCiTarget);
   console.log("  ✅ Copied tests/.env.ci for E2E tests");
-}
-
-// Step 4: Update upstream's prebuild and postbuild scripts
-// For release-0.2, we override both scripts with ES module syntax
-const prebuildPath = path.join(workspaceDir, "scripts/prebuild.js");
-const prebuildContent = `#!/usr/bin/env node
-/**
- * MTA prebuild wrapper - calls apply-branding.js for single extension (release-0.2)
- * Uses ES module import syntax for compatibility with upstream package.json "type": "module"
- */
-
-import "./apply-branding.js";
-
-// Ensure the process exits with proper error codes
-process.on('uncaughtException', (error) => {
-  console.error('❌ FATAL: Uncaught exception in prebuild:', error.message);
-  console.error(error.stack);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ FATAL: Unhandled promise rejection in prebuild:', reason);
-  process.exit(1);
-});
-`;
-fs.writeFileSync(prebuildPath, prebuildContent);
-console.log("  ✅ Updated scripts/prebuild.js to call apply-branding.js (ES modules)");
-
-// Override postbuild script to call our verification
-const postbuildPath = path.join(workspaceDir, "scripts/postbuild.js");
-// Check if our postbuild was copied, if so the content is already there
-if (fs.existsSync(path.join(workspaceDir, "scripts/postbuild.js"))) {
-  console.log("  ✅ Postbuild script already in place");
-} else {
-  // Create a simple postbuild that just runs verification
-  const postbuildContent = `#!/usr/bin/env node
-/**
- * MTA postbuild wrapper - runs verification for single extension (release-0.2)
- * Uses ES module import syntax for compatibility with upstream package.json "type": "module"
- */
-
-console.log("✅ MTA postbuild verification complete (placeholder)");
-`;
-  fs.writeFileSync(postbuildPath, postbuildContent);
-  console.log("  ✅ Created placeholder scripts/postbuild.js");
 }
 
 // Step 5: Create a marker file with build info

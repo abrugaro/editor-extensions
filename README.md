@@ -66,7 +66,7 @@ To use a specific tag:
 
 ### Making Changes
 
-- **Branding changes**: Edit `scripts/apply-branding.js`
+- **Branding changes**: Edit `scripts/prebuild.js` (and `scripts/postbuild.js` for verification/versioning)
 - **Assets**: Add files to `assets/branding/` directory
 - **Upstream version**: Use `./scripts/update-upstream.sh`
 
@@ -103,13 +103,14 @@ migtools-release02/
 ├── package.json             # Build orchestrator
 ├── scripts/
 │   ├── pull-upstream.js     # Fetch and prepare upstream code
-│   ├── apply-branding.js    # Apply MTA branding transformations
+│   ├── prebuild.js          # Apply MTA branding transformations
+│   ├── postbuild.js         # Post-build verification/versioning
 │   └── update-upstream.sh   # Update upstream reference
 ├── assets/
 │   ├── branding/            # MTA-specific assets
 │   │   ├── sidebar-icons/   # VSCode activity bar icons
-│   │   ├── avatars/         # Webview avatar images
-│   │   └── README.md        # Extension marketplace description
+│   │   ├── avatar-icons/    # Webview avatar images
+│   │   └── README.md        # Extension marketplace description (source)
 │   └── README.md            # Asset documentation
 ├── .github/workflows/
 │   └── ci.yml               # Build and release automation
@@ -121,8 +122,8 @@ migtools-release02/
 For full branding, provide these assets:
 
 - `assets/branding/sidebar-icons/icon.png` - VSCode activity bar icon
-- `assets/branding/avatars/avatar.svg` - Webview UI avatar
-- `assets/branding/README.md` - Extension marketplace description
+- `assets/branding/avatar-icons/avatar.svg` - Webview UI avatar
+- `assets/README.md` - Extension marketplace description (copied to `vscode/README.md` during build)
 
 If assets are missing, the build will continue with warnings.
 
