@@ -559,7 +559,6 @@ jobs:
 
       - name: Run infrastructure tests
         run: npx playwright test --grep "@requires-minikube"
-        #run: npx playwright test ./e2e/tests/ccm/hub-configuration.test.ts
         working-directory: ./tests
         env:
           __TEST_EXTENSION_END_TO_END__: "true"

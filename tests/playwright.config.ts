@@ -10,7 +10,7 @@ export default defineConfig({
   testDir: './e2e/tests',
   outputDir: 'test-output',
   globalSetup: require.resolve('./global.setup.ts'),
-  //forbidOnly: !!process.env.CI, TODO @abrugaro remove
+  forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
   timeout: 120000,
