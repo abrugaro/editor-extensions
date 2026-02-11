@@ -333,6 +333,6 @@ export function getHubConfig(overrides?: Partial<HubConfiguration>): HubConfigur
       };
     }
   }
-
+  console.log('utils.getHubConfig: Hub config', config);
   return config;
 }

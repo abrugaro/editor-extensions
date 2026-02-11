@@ -29,7 +29,7 @@ async function main() {
   // Core: konveyor-X.X.X-dev.*.vsix (no language suffix after "konveyor-")
   // Language-specific: konveyor-{language}-X.X.X-dev.*.vsix
   const extensions = [
-    { name: 'CORE', pattern: /^konveyor-\d+\.\d+\.\d+-dev\..*\.vsix$/ },
+    { name: 'CORE', pattern: /^konveyor-core-\d+\.\d+\.\d+-dev\..*\.vsix$/ },
     { name: 'JAVA', pattern: /^konveyor-java-\d+\.\d+\.\d+-dev\..*\.vsix$/ },
     { name: 'JAVASCRIPT', pattern: /^konveyor-javascript-\d+\.\d+\.\d+-dev\..*\.vsix$/ },
     { name: 'GO', pattern: /^konveyor-go-\d+\.\d+\.\d+-dev\..*\.vsix$/ },
