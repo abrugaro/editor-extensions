@@ -6,7 +6,6 @@ import { generateRandomString } from '../../utilities/utils';
 import { KAIViews } from '../../enums/views.enum';
 import { genAISettingKey } from '../../enums/configuration-options.enum';
 import * as VSCodeFactory from '../../utilities/vscode.factory';
-import { equal } from 'assert';
 
 test.describe.serial('Configure extension and run analysis', { tag: ['@tier0'] }, () => {
   let vscodeApp: VSCode;
@@ -44,9 +43,7 @@ test.describe.serial('Configure extension and run analysis', { tag: ['@tier0'] }
     await vscodeApp.waitDefault();
     await vscodeApp.runAnalysis();
     await vscodeApp.waitDefault();
-    await expect(vscodeApp.getWindow().getByText('Analysis completed').first()).toBeVisible({
-      timeout: 400000,
-    });
+    await vscodeApp.waitForAnalysisCompleted();
   });
 
   test('Disable and enable Generative AI', async () => {
