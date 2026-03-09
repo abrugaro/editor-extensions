@@ -52,11 +52,11 @@ import { DiagnosticTaskManager } from "./taskManager/taskManager";
 // Removed registerSuggestionCommands import since we're using merge editor now
 // Removed InlineSuggestionCodeActionProvider import since we're using merge editor now
 import { ParsedModelConfig } from "./modelProvider/types";
-import { getModelProviderFromConfig, parseModelConfig } from "./modelProvider";
+import { getModelProviderFromConfig, parseModelConfig, runModelHealthCheck } from "./modelProvider";
 import { BaseModelProvider, type ModelProviderOptions } from "./modelProvider/modelProvider";
 import { getCacheForModelProvider } from "./modelProvider/utils";
 import { ChatOpenAI } from "@langchain/openai";
-import { BaseMessage } from "@langchain/core/messages";
+import { AIMessage, BaseMessage } from "@langchain/core/messages";
 import winston from "winston";
 import * as pathlib from "path";
 import { OutputChannelTransport } from "winston-transport-vscode";
@@ -557,6 +557,9 @@ class VsCodeExtension {
         if (llmProxyConfig?.available) {
           this.createHubProxyModelProvider(llmProxyConfig)
             .then((provider) => {
+              this.state.logger.info("ABRUGARO 1");
+              this.state.logger.info(provider);
+
               this.state.modelProvider = provider;
               this.state.logger.info("Model provider updated with Hub LLM proxy");
 
@@ -1291,34 +1294,48 @@ class VsCodeExtension {
       throw new Error("No bearer token available for Hub LLM proxy authentication");
     }
 
+    // Get scoped fetch for SSL/TLS handling (insecure certs, custom CA bundles)
+    const scopedFetch = this.state.hubConnectionManager.getScopedFetch();
+    const isInsecure = this.state.hubConnectionManager.isInsecure();
+
     this.state.logger.info("Creating Hub LLM proxy model provider", {
       endpoint: llmProxyConfig.endpoint,
       model: llmProxyConfig.model,
       hasToken: !!bearerToken,
+      hasScopedFetch: !!scopedFetch,
+      isInsecure,
     });
 
     // Create OpenAI-compatible chat models pointing to Hub proxy
     // Use model from Hub configuration, fallback to gpt-4o if not specified
     const modelName = llmProxyConfig.model || "gpt-4o";
 
+    // Configuration for OpenAI client - include custom fetch if needed for SSL
+    const openAIConfig = {
+      baseURL: llmProxyConfig.endpoint,
+      ...(scopedFetch ? { fetch: scopedFetch } : {}),
+    };
+
     const streamingModel = new ChatOpenAI({
-      openAIApiKey: bearerToken, // Use JWT as API key
-      configuration: {
-        baseURL: llmProxyConfig.endpoint, // Point to Hub's proxy endpoint
-      },
-      modelName,
+      apiKey: bearerToken,
+      configuration: openAIConfig,
+      model: modelName,
       temperature: 0,
       streaming: true,
     });
 
     const nonStreamingModel = new ChatOpenAI({
-      openAIApiKey: bearerToken,
-      configuration: {
-        baseURL: llmProxyConfig.endpoint,
-      },
-      modelName,
+      apiKey: bearerToken,
+      configuration: openAIConfig,
+      model: modelName,
       temperature: 0,
       streaming: false,
+    });
+
+    this.state.logger.info("Hub LLM proxy models created", {
+      endpoint: llmProxyConfig.endpoint,
+      model: modelName,
+      hasScopedFetch: !!scopedFetch,
     });
 
     // Set up cache and tracer directories
@@ -1357,6 +1374,16 @@ class VsCodeExtension {
         this.state.logger.info("Using cached Hub proxy capabilities", capabilities);
       }
     }
+    this.state.logger.info("ABRUGARO ABOUT TO RUN HEALTCHDK ");
+
+    capabilities = await runModelHealthCheck(streamingModel, nonStreamingModel);
+    if (getConfigKaiDemoMode()) {
+      await cache.set("capabilities", new AIMessage(JSON.stringify(capabilities)), {
+        cacheSubDir: "healthcheck",
+      });
+    }
+    this.state.logger.info("ABRUGARO 2");
+    this.state.logger.info(capabilities);
 
     const options: ModelProviderOptions = {
       streamingModel,

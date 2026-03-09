@@ -184,6 +184,21 @@ export class HubConnectionManager {
   }
 
   /**
+   * Get the scoped fetch function for Hub connections (handles SSL/TLS)
+   * Returns undefined if no custom fetch is needed (standard SSL)
+   */
+  public getScopedFetch(): typeof fetch | undefined {
+    return this.scopedFetch ?? undefined;
+  }
+
+  /**
+   * Check if SSL certificate verification is disabled
+   */
+  public isInsecure(): boolean {
+    return this.config.auth.insecure ?? false;
+  }
+
+  /**
    * Check if authentication is valid
    */
   public hasValidAuth(): boolean {

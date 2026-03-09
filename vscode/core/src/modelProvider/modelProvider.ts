@@ -231,6 +231,7 @@ export async function runModelHealthCheck(
     supportsTools: false,
     supportsToolsInStreaming: false,
   };
+  console.log("insiderunmodelhealtcheck");
 
   const tool: DynamicStructuredTool = new DynamicStructuredTool({
     name: "gamma",
@@ -257,6 +258,15 @@ export async function runModelHealthCheck(
   }
 
   try {
+    const sys_message = new SystemMessage(`answer hello to all messages`);
+    const human_message = new HumanMessage(`hi`);
+    const aux = await streamingModel.invoke([sys_message, human_message]);
+    console.log(aux);
+    console.log("a model provider aux");
+    const baux = await nonStreamingModel.invoke([sys_message, human_message]);
+    console.log(baux);
+    console.log("b model provider baux");
+
     let containsToolCall = false;
     const stream = await runnable.stream([sys_message, human_message]);
     if (stream) {
@@ -278,6 +288,7 @@ export async function runModelHealthCheck(
       err,
     );
   }
+  console.log("waaaaa");
 
   try {
     // if we're here, model does not support tool calls in streaming
@@ -293,9 +304,11 @@ export async function runModelHealthCheck(
     console.error("Error when using a non streaming client for tool calls", err);
   }
 
+  console.log("aaaa");
   // check if we are connected to the model, this will throw an error if not
   await nonStreamingModel.invoke("a");
-
+  console.log("bbbb");
+  console.log(response);
   return response;
 }
 
