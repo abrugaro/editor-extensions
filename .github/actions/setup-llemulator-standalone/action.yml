@@ -12,18 +12,26 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Pull and start llemulator container
+    - name: Clone and build llemulator
+      shell: bash
+      run: |
+        echo "=== Cloning llemulator repository ==="
+        git clone --depth 1 https://github.com/fabianvf/llemulator.git /tmp/llemulator
+
+        echo "=== Building llemulator Docker image ==="
+        cd /tmp/llemulator
+        docker build -t llemulator:local .
+
+    - name: Start llemulator container
       id: start_llemulator
       shell: bash
       run: |
         echo "=== Starting llemulator container ==="
 
-        docker pull ghcr.io/fabianvf/llemulator:latest
-
         docker run -d \
           --name llemulator \
           -p ${{ inputs.port }}:8080 \
-          ghcr.io/fabianvf/llemulator:latest
+          llemulator:local
 
         LLEMULATOR_URL="http://localhost:${{ inputs.port }}"
         echo "url=${LLEMULATOR_URL}" >> $GITHUB_OUTPUT
