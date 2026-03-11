@@ -20,7 +20,7 @@ import { buildKaiResponse, loadLlemulatorResponses } from '../../utilities/llemu
 
 const FILES_NAMES = ['CatalogService.java', 'InventoryNotificationMDB.java'];
 
-test.describe('Plugin Settings - Analyze on Save', { tag: ['@tier3', '@slow'] }, () => {
+test.describe('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, () => {
   let vscodeApp: VSCode;
   let tabManager: TabManager;
   const profileName = `plugins-settings-${generateRandomString()}`;
