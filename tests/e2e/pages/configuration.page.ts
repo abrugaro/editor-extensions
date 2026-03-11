@@ -2,6 +2,7 @@ import { VSCode } from './vscode.page';
 import { extensionId } from '../utilities/utils';
 import { VSCodeWeb } from './vscode-web.page';
 import { expect } from '@playwright/test';
+import { SCREENSHOTS_FOLDER } from '../utilities/consts';
 
 export class Configuration {
   public constructor(private readonly vsCode: VSCode) {}
@@ -30,6 +31,9 @@ export class Configuration {
   public async setEnabledConfiguration(configuration: string, enabled: boolean) {
     const window = this.vsCode.getWindow();
     const checkbox = window.getByLabel(configuration);
+    await window.screenshot({
+      path: `${SCREENSHOTS_FOLDER}/set-${configuration}-to-${enabled}.png`,
+    });
     await checkbox.setChecked(enabled);
   }
 

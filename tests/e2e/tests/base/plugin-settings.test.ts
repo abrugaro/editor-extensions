@@ -17,6 +17,7 @@ import {
   LLEMULATOR_PROVIDER,
 } from '../../fixtures/provider-configs.fixture';
 import { buildKaiResponse, loadLlemulatorResponses } from '../../utilities/llemulator.utils';
+import { SCREENSHOTS_FOLDER } from '../../utilities/consts';
 
 const FILES_NAMES = ['CatalogService.java', 'InventoryNotificationMDB.java'];
 
@@ -111,6 +112,10 @@ test.describe('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, () => {
 
   test.beforeEach(async function () {
     test.setTimeout(300000);
+    const testName = test.info().title.replace(' ', '-');
+    await vscodeApp.getWindow().screenshot({
+      path: `${SCREENSHOTS_FOLDER}/before-${testName}.png`,
+    });
   });
 
   test('Enable "Analyze on Save" setting', async () => {
