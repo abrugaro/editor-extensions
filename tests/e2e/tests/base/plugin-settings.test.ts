@@ -26,8 +26,6 @@ test.describe('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, () => {
   const profileName = `plugins-settings-${generateRandomString()}`;
 
   test.beforeAll(async ({ testRepoData }) => {
-    test.setTimeout(300000);
-
     if (getDefaultProviderConfig() === LLEMULATOR_PROVIDER) {
       await loadLlemulatorResponses({
         reset: true,
@@ -109,6 +107,10 @@ test.describe('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, () => {
     await vscodeApp.configureGenerativeAI(getDefaultProviderConfig().config);
     await vscodeApp.waitDefault();
     tabManager = new TabManager(vscodeApp);
+  });
+
+  test.beforeEach(async function () {
+    test.setTimeout(300000);
   });
 
   test('Enable "Analyze on Save" setting', async () => {
