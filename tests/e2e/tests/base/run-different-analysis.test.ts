@@ -8,7 +8,7 @@ import { generateRandomString } from '../../utilities/utils';
 const testReposPath = pathlib.join(__dirname, '../../fixtures/test-repos.json');
 const testReposData: RepoData = JSON.parse(readFileSync(testReposPath, 'utf-8'));
 
-test.describe('Run analysis for different repositories', { tag: ['@tier3'] }, () => {
+test.describe('Run analysis for different repositories', { tag: ['@tier1'] }, () => {
   for (const repoKey of ['coolstore', 'inventory_management', 'ehr']) {
     const repoInfo = testReposData[repoKey];
     test(`Analyze ${repoKey} app`, async () => {
