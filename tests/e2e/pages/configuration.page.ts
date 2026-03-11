@@ -32,7 +32,7 @@ export class Configuration {
     const window = this.vsCode.getWindow();
     const checkbox = window.getByLabel(configuration);
     await window.screenshot({
-      path: `${SCREENSHOTS_FOLDER}/set-${configuration}-to-${enabled}.png`,
+      path: `${SCREENSHOTS_FOLDER}/set-${configuration.replace(/[_"'\s]/g, '')}-to-${enabled}.png`,
     });
     await checkbox.setChecked(enabled);
   }

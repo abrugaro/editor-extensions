@@ -112,7 +112,7 @@ test.describe('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, () => {
 
   test.beforeEach(async function () {
     test.setTimeout(300000);
-    const testName = test.info().title.replace(' ', '-');
+    const testName = test.info().title.replace(/[_"'\s]/g, '');
     await vscodeApp.getWindow().screenshot({
       path: `${SCREENSHOTS_FOLDER}/before-${testName}.png`,
     });
