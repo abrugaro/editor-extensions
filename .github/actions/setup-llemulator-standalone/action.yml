@@ -33,7 +33,7 @@ runs:
           -p ${{ inputs.port }}:8080 \
           llemulator:local
 
-        LLEMULATOR_URL="http://localhost:${{ inputs.port }}"
+        LLEMULATOR_URL="http://localhost:${{ inputs.port }}/v1"
         echo "url=${LLEMULATOR_URL}" >> $GITHUB_OUTPUT
         echo "LLEMULATOR_URL=${LLEMULATOR_URL}" >> $GITHUB_ENV
 
