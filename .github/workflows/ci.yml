@@ -92,8 +92,8 @@ jobs:
           echo "upstream_sha=${UPSTREAM_SHA}" >> $GITHUB_OUTPUT
           echo "upstream_sha_short=${UPSTREAM_SHA_SHORT}" >> $GITHUB_OUTPUT
 
-          # Get MTA version from transformed package.json
-          MTA_VERSION=$(node -p "require('./vscode/package.json').version")
+          # Get MTA version from core extension package.json
+          MTA_VERSION=$(node -p "require('./vscode/core/package.json').version")
           echo "mta_version=${MTA_VERSION}" >> $GITHUB_OUTPUT
 
       - name: Display build configuration
@@ -114,16 +114,37 @@ jobs:
       - name: Verify MTA branding applied
         working-directory: ./.upstream-workspace
         run: |
-          # Check that package.json has correct MTA branding
-          PACKAGE_NAME=$(node -p "require('./vscode/package.json').name")
-          if [[ "$PACKAGE_NAME" != "mta-vscode-extension" ]]; then
-            echo "❌❌❌ FATAL: MTA branding failed!"
-            echo "❌ Expected package name: mta-vscode-extension"
-            echo "❌ Actual package name: $PACKAGE_NAME"
-            echo "❌❌❌ Build cannot continue without proper branding ❌❌❌"
+          # Check core extension
+          CORE_NAME=$(node -p "require('./vscode/core/package.json').name")
+          if [[ "$CORE_NAME" != "mta-core" ]]; then
+            echo "❌ FATAL: Core extension branding failed!"
+            echo "❌ Expected: mta-core, got: $CORE_NAME"
             exit 1
           fi
-          echo "✅ MTA branding verification passed: $PACKAGE_NAME"
+          echo "✅ Core extension: $CORE_NAME"
+
+          # Check extension pack
+          PACK_NAME=$(node -p "require('./vscode/konveyor/package.json').name")
+          if [[ "$PACK_NAME" != "mta-vscode-extension" ]]; then
+            echo "❌ FATAL: Extension pack branding failed!"
+            echo "❌ Expected: mta-vscode-extension, got: $PACK_NAME"
+            exit 1
+          fi
+          echo "✅ Extension pack: $PACK_NAME"
+
+          # Check language extensions
+          for lang in java javascript go csharp; do
+            LANG_NAME=$(node -p "require('./vscode/${lang}/package.json').name")
+            EXPECTED="mta-${lang}"
+            if [[ "$LANG_NAME" != "$EXPECTED" ]]; then
+              echo "❌ FATAL: ${lang} extension branding failed!"
+              echo "❌ Expected: $EXPECTED, got: $LANG_NAME"
+              exit 1
+            fi
+            echo "✅ ${lang} extension: $LANG_NAME"
+          done
+
+          echo "✅ All MTA branding verifications passed"
 
   test:
     name: Test
@@ -220,19 +241,25 @@ jobs:
             npm version "$DEV_VERSION" --workspaces --include-workspace-root --no-git-tag-version
           fi
 
-      - name: Package extension
+      - name: Package extensions
         working-directory: ./.upstream-workspace
         run: |
           npm run dist
           npm run package
 
-      - name: Upload VSIX artifact
+      - name: List packaged extensions
+        working-directory: ./.upstream-workspace
+        run: |
+          echo "Packaged VSIX files:"
+          ls -la dist/*.vsix
+
+      - name: Upload VSIX artifacts
         uses: actions/upload-artifact@v4
         with:
           name: vsix-artifact
           path: .upstream-workspace/dist/*.vsix
 
-      - name: Upload VSIX artifact
+      - name: Upload VSIX artifacts (timestamped)
         uses: actions/upload-artifact@v4
         with:
           name: mta-vsix-artifact-${{ github.run_number }}
@@ -320,29 +347,31 @@ jobs:
           dbus-daemon --session --address=$DBUS_SESSION_BUS_ADDRESS --nofork --nopidfile --syslog-only &
           mkdir -p ~/.vscode && echo '{ "disable-hardware-acceleration": true }' > ~/.vscode/argv.json
 
-      - name: Download VSIX artifact
+      - name: Download VSIX artifacts
         uses: actions/download-artifact@v4
         with:
           name: mta-vsix-artifact-${{ github.run_number }}
           path: ./artifacts
 
-      - name: Set VSIX path
-        id: set_vsix_path
-        run: echo "vsix_path=$(ls -1 ./artifacts/*.vsix)" >> $GITHUB_OUTPUT
+      - name: Set VSIX paths
+        id: set_vsix_paths
+        run: |
+          echo "Found VSIX files:"
+          find ./artifacts -name "*.vsix" -ls
 
       - name: Run e2e tests (Linux)
         run: npx playwright test e2e/tests/base/configure-and-run-analysis.test.ts
         working-directory: ./.upstream-workspace/tests
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          VSIX_FILE_PATH: ${{ github.workspace }}/${{ steps.set_vsix_path.outputs.vsix_path }}
+          VSIX_FILE_PATH: ${{ github.workspace }}/artifacts
 
       # This is intentionally kept in a separate step to avoid passing in credentials
       - name: Run e2e tests (Linux - Offline)
         run: npx playwright test e2e/tests/agent_flow_coolstore.test.ts
         working-directory: ./.upstream-workspace/tests
         env:
-          VSIX_FILE_PATH: ${{ github.workspace }}/${{ steps.set_vsix_path.outputs.vsix_path }}
+          VSIX_FILE_PATH: ${{ github.workspace }}/artifacts
           OPENAI_API_KEY: <dummy> # this only exists to pass provider validation
 
   publish-development:
@@ -360,7 +389,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download VSIX artifact
+      - name: Download VSIX artifacts
         uses: actions/download-artifact@v4
         with:
           name: mta-vsix-artifact-${{ github.run_number }}
@@ -375,24 +404,26 @@ jobs:
 
       - name: Publish to development builds release
         run: |
-          # Find VSIX file
-          VSIX_FILE=$(find ./artifacts -name "*.vsix" | head -1)
-          if [[ -z "$VSIX_FILE" ]]; then
-            echo "Error: No VSIX file found"
+          # Find all VSIX files
+          VSIX_FILES=$(find ./artifacts -name "*.vsix")
+          if [[ -z "$VSIX_FILES" ]]; then
+            echo "Error: No VSIX files found"
             exit 1
           fi
 
-          echo "Found VSIX file: $VSIX_FILE"
-          echo "File size: $(ls -lh "$VSIX_FILE")"
+          echo "Found VSIX files:"
+          echo "$VSIX_FILES"
 
           # Check if we can access the release
           echo "Checking development-builds release..."
           gh release view development-builds --json name,tagName,url
 
-          # Upload to development-builds release
-          echo "Uploading $VSIX_FILE to development-builds release..."
-          gh release upload development-builds "$VSIX_FILE" --clobber
-          echo "Published development build: $(basename "$VSIX_FILE")"
+          # Upload each VSIX to development-builds release
+          while IFS= read -r VSIX_FILE; do
+            echo "Uploading $VSIX_FILE to development-builds release..."
+            gh release upload development-builds "$VSIX_FILE" --clobber
+            echo "Published: $(basename "$VSIX_FILE")"
+          done <<< "$VSIX_FILES"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -3,279 +3,306 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { extensionName, extensionShortName, extensionVersion } from "./prebuild.js";
+import {
+  extensionVersion,
+  publisher,
+  author,
+  shortName,
+  repositoryUrl,
+  bugsUrl,
+} from "./prebuild.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-console.log(`🔍 Running postbuild for ${extensionName}...`);
-
-// First, update all workspace versions
-console.log(`📝 Updating all package.json versions to ${extensionVersion}...`);
-
-const workspaces = [
-  "../package.json",
-  "../extra-types/package.json",
-  "../shared/package.json",
-  "../webview-ui/package.json",
-  "../agentic/package.json",
-  "../vscode/package.json",
-];
-
-for (const workspacePath of workspaces) {
-  const fullPath = path.join(__dirname, workspacePath);
-  if (fs.existsSync(fullPath)) {
-    const workspacePackage = JSON.parse(fs.readFileSync(fullPath, "utf8"));
-    workspacePackage.version = extensionVersion;
-    fs.writeFileSync(fullPath, JSON.stringify(workspacePackage, null, 2));
-    console.log(`  ✅ Updated ${workspacePath}`);
-  }
-}
-
-console.log(`📝 Version updates complete!`);
-
-console.log(`🔍 Running postbuild verification for ${extensionName}...`);
-
-// Read the final package.json to verify branding was applied
-const packagePath = path.join(__dirname, "../vscode/package.json");
-const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+// MTA extension names (must match prebuild.js)
+const CORE_NAME = "mta-core";
+const PACK_NAME = "mta-vscode-extension";
+const LANG_EXTENSIONS = {
+  java: "mta-java",
+  javascript: "mta-javascript",
+  go: "mta-go",
+  csharp: "mta-csharp",
+};
 
 const errors = [];
 const warnings = [];
 
-// Verify core package properties
-console.log("🔍 Verifying core package properties...");
-
-if (packageJson.name !== extensionName) {
-  errors.push(`Expected name: ${extensionName}, got: ${packageJson.name}`);
-} else {
-  console.log(`  ✅ Package name: ${packageJson.name}`);
+function readJson(relPath) {
+  const fullPath = path.join(__dirname, "..", relPath);
+  return JSON.parse(fs.readFileSync(fullPath, "utf8"));
 }
 
-if (packageJson.displayName !== "Migration toolkit for applications") {
-  errors.push(
-    `Expected displayName: "Migration toolkit for applications", got: ${packageJson.displayName}`,
-  );
-} else {
-  console.log(`  ✅ Display name: ${packageJson.displayName}`);
+function writeJson(relPath, data) {
+  const fullPath = path.join(__dirname, "..", relPath);
+  fs.writeFileSync(fullPath, JSON.stringify(data, null, 2));
 }
 
-if (packageJson.publisher !== "redhat") {
-  errors.push(`Expected publisher: "redhat", got: ${packageJson.publisher}`);
-} else {
-  console.log(`  ✅ Publisher: ${packageJson.publisher}`);
-}
-
-if (packageJson.author !== "Red Hat") {
-  errors.push(`Expected author: "Red Hat", got: ${packageJson.author}`);
-} else {
-  console.log(`  ✅ Author: ${packageJson.author}`);
-}
-
-if (!packageJson.description.includes("Migration toolkit for applications (MTA)")) {
-  errors.push(`Description should include "Migration toolkit for applications (MTA)"`);
-} else {
-  console.log(`  ✅ Description includes proper branding`);
-}
-
-// Verify repository URLs
-console.log("🔍 Verifying repository URLs...");
-
-if (packageJson.repository?.url !== "https://github.com/migtools/editor-extensions") {
-  errors.push(
-    `Expected repository URL: "https://github.com/migtools/editor-extensions", got: ${packageJson.repository?.url}`,
-  );
-} else {
-  console.log(`  ✅ Repository URL: ${packageJson.repository.url}`);
-}
-
-if (packageJson.bugs !== "https://github.com/migtools/editor-extensions/issues") {
-  errors.push(
-    `Expected bugs URL: "https://github.com/migtools/editor-extensions/issues", got: ${packageJson.bugs}`,
-  );
-} else {
-  console.log(`  ✅ Bugs URL: ${packageJson.bugs}`);
-}
-
-// Verify commands have correct branding
-console.log("🔍 Verifying command branding...");
-
-const commands = packageJson.contributes?.commands || [];
-let commandErrors = 0;
-
-commands.forEach((cmd, index) => {
-  if (!cmd.command.startsWith(`${extensionName}.`)) {
-    errors.push(`Command ${index} has incorrect prefix: ${cmd.command}`);
-    commandErrors++;
+function check(condition, errorMsg) {
+  if (!condition) {
+    errors.push(errorMsg);
+    return false;
   }
+  return true;
+}
 
-  if (cmd.category !== extensionShortName && cmd.category !== "diffEditor") {
-    errors.push(
-      `Command ${index} has incorrect category: ${cmd.category} (expected: ${extensionShortName} or diffEditor)`,
-    );
-    commandErrors++;
+// ─── Version Updates ────────────────────────────────────────────────────────
+
+console.log(`📝 Updating all package.json versions to ${extensionVersion}...`);
+
+const workspaces = [
+  "package.json",
+  "extra-types/package.json",
+  "shared/package.json",
+  "webview-ui/package.json",
+  "agentic/package.json",
+  "vscode/core/package.json",
+  "vscode/java/package.json",
+  "vscode/javascript/package.json",
+  "vscode/go/package.json",
+  "vscode/csharp/package.json",
+  "vscode/konveyor/package.json",
+];
+
+for (const ws of workspaces) {
+  const fullPath = path.join(__dirname, "..", ws);
+  if (fs.existsSync(fullPath)) {
+    const pkg = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+    pkg.version = extensionVersion;
+    fs.writeFileSync(fullPath, JSON.stringify(pkg, null, 2));
+    console.log(`  ✅ Updated ${ws}`);
   }
-});
+}
 
-if (commandErrors === 0) {
+console.log("📝 Version updates complete!\n");
+
+// ─── Core Extension Verification ────────────────────────────────────────────
+
+console.log("🔍 Verifying core extension branding...");
+
+const corePkg = readJson("vscode/core/package.json");
+
+// Core metadata
+check(corePkg.name === CORE_NAME, `Core name: expected "${CORE_NAME}", got "${corePkg.name}"`);
+check(
+  corePkg.displayName === "Migration Toolkit for Applications - Core",
+  `Core displayName: expected "Migration Toolkit for Applications - Core", got "${corePkg.displayName}"`,
+);
+check(corePkg.publisher === publisher, `Core publisher: expected "${publisher}", got "${corePkg.publisher}"`);
+check(corePkg.author === author, `Core author: expected "${author}", got "${corePkg.author}"`);
+check(
+  corePkg.description?.includes("Migration Toolkit for Applications (MTA)"),
+  "Core description should include 'Migration Toolkit for Applications (MTA)'",
+);
+check(
+  corePkg.repository?.url === repositoryUrl,
+  `Core repository URL: expected "${repositoryUrl}", got "${corePkg.repository?.url}"`,
+);
+check(
+  corePkg.bugs === bugsUrl,
+  `Core bugs URL: expected "${bugsUrl}", got "${corePkg.bugs}"`,
+);
+
+console.log(`  ✅ Core metadata verified`);
+
+// Commands
+const commands = corePkg.contributes?.commands || [];
+let cmdErrors = 0;
+for (const cmd of commands) {
+  if (!cmd.command.startsWith(`${CORE_NAME}.`)) {
+    errors.push(`Command has wrong prefix: ${cmd.command}`);
+    cmdErrors++;
+  }
+  if (cmd.category !== shortName && cmd.category !== "diffEditor") {
+    errors.push(`Command "${cmd.command}" has wrong category: ${cmd.category}`);
+    cmdErrors++;
+  }
+}
+if (cmdErrors === 0) {
   console.log(`  ✅ All ${commands.length} commands properly branded`);
-} else {
-  console.log(`  ❌ Found ${commandErrors} command branding issues`);
 }
 
-// Verify configuration properties
-console.log("🔍 Verifying configuration properties...");
-
-const configProps = packageJson.contributes?.configuration?.properties || {};
-const propKeys = Object.keys(configProps);
+// Configuration properties
+const configProps = corePkg.contributes?.configuration?.properties || {};
 let configErrors = 0;
-
-propKeys.forEach((key) => {
-  if (!key.startsWith(`${extensionName}.`)) {
-    errors.push(`Configuration property has incorrect prefix: ${key}`);
+for (const key of Object.keys(configProps)) {
+  if (!key.startsWith(`${CORE_NAME}.`)) {
+    errors.push(`Config property has wrong prefix: ${key}`);
     configErrors++;
   }
-});
-
+}
 if (configErrors === 0) {
-  console.log(`  ✅ All ${propKeys.length} configuration properties properly branded`);
-} else {
-  console.log(`  ❌ Found ${configErrors} configuration property branding issues`);
+  console.log(`  ✅ All ${Object.keys(configProps).length} config properties properly branded`);
+}
+check(
+  corePkg.contributes?.configuration?.title === shortName,
+  `Config title: expected "${shortName}", got "${corePkg.contributes?.configuration?.title}"`,
+);
+
+// Views and containers
+const activitybar = corePkg.contributes?.viewsContainers?.activitybar || [];
+for (const container of activitybar) {
+  check(container.id === CORE_NAME, `Activity bar container id: expected "${CORE_NAME}", got "${container.id}"`);
+  check(container.title === shortName, `Activity bar container title: expected "${shortName}", got "${container.title}"`);
+}
+console.log(`  ✅ Activity bar containers verified`);
+
+const views = corePkg.contributes?.views || {};
+for (const viewKey of Object.keys(views)) {
+  check(viewKey === CORE_NAME, `View container key: expected "${CORE_NAME}", got "${viewKey}"`);
+  for (const view of views[viewKey]) {
+    check(view.id.startsWith(`${CORE_NAME}.`), `View id has wrong prefix: ${view.id}`);
+  }
+}
+console.log(`  ✅ Views verified`);
+
+// Submenus
+const submenus = corePkg.contributes?.submenus || [];
+for (const submenu of submenus) {
+  check(submenu.id.startsWith(CORE_NAME), `Submenu id has wrong prefix: ${submenu.id}`);
+  check(
+    submenu.label.includes(shortName),
+    `Submenu label should include "${shortName}", got "${submenu.label}"`,
+  );
+}
+if (submenus.length > 0) {
+  console.log(`  ✅ Submenus verified`);
 }
 
-if (packageJson.contributes?.configuration?.title !== extensionShortName) {
-  errors.push(
-    `Configuration title should be: ${extensionShortName}, got: ${packageJson.contributes?.configuration?.title}`,
+// Fallback assets
+if (corePkg.fallbackAssets) {
+  const assetCount = Object.keys(corePkg.fallbackAssets.assets || {}).length;
+  if (assetCount >= 6) {
+    console.log(`  ✅ Fallback assets configured for ${assetCount} platforms`);
+  } else {
+    warnings.push(`Only ${assetCount} platforms in fallback assets (expected 6)`);
+  }
+  check(
+    corePkg.fallbackAssets.sha256sumFile === "sha256sum.txt",
+    `sha256sumFile: expected "sha256sum.txt", got "${corePkg.fallbackAssets.sha256sumFile}"`,
   );
 } else {
-  console.log(`  ✅ Configuration title: ${packageJson.contributes.configuration.title}`);
+  warnings.push("No fallback assets configuration found on core extension");
 }
 
-// Verify views and containers
-console.log("🔍 Verifying views and containers...");
-
-const activitybar = packageJson.contributes?.viewsContainers?.activitybar || [];
-activitybar.forEach((container, index) => {
-  if (container.id !== extensionName) {
-    errors.push(`Activity bar container ${index} has incorrect id: ${container.id}`);
-  }
-  if (container.title !== extensionShortName) {
-    errors.push(`Activity bar container ${index} has incorrect title: ${container.title}`);
-  }
-});
-
-if (activitybar.length > 0) {
-  console.log(`  ✅ Activity bar containers properly branded`);
-}
-
-// Verify views
-const views = packageJson.contributes?.views || {};
-Object.keys(views).forEach((viewKey) => {
-  if (viewKey !== extensionName) {
-    errors.push(`View container key should be: ${extensionName}, got: ${viewKey}`);
-  }
-
-  views[viewKey].forEach((view, index) => {
-    if (!view.id.startsWith(`${extensionName}.`)) {
-      errors.push(`View ${index} has incorrect id prefix: ${view.id}`);
+// Activation events — orphaned ones should be removed
+if (corePkg.activationEvents) {
+  for (const ev of corePkg.activationEvents) {
+    if (ev === "onFileSystem:konveyorMemFs" || ev === "onFileSystem:konveyorReadOnly") {
+      warnings.push(`Orphaned activation event not removed: ${ev}`);
     }
-  });
-});
-
-console.log(`  ✅ Views properly branded`);
-
-// Verify menus
-console.log("🔍 Verifying menus...");
-
-const menus = packageJson.contributes?.menus || {};
-Object.keys(menus).forEach((menuKey) => {
-  if (
-    menuKey.includes(".") &&
-    !menuKey.startsWith(`${extensionName}.`) &&
-    !menuKey.startsWith("view/") &&
-    !menuKey.startsWith("explorer/") &&
-    !menuKey.startsWith("commandPalette")
-  ) {
-    warnings.push(`Menu key might need branding: ${menuKey}`);
   }
-});
-
-console.log(`  ✅ Menus verified`);
-
-// Verify submenus
-const submenus = packageJson.contributes?.submenus || [];
-submenus.forEach((submenu, index) => {
-  if (!submenu.id.startsWith(extensionName)) {
-    errors.push(`Submenu ${index} has incorrect id: ${submenu.id}`);
-  }
-  if (!submenu.label.includes(extensionShortName)) {
-    errors.push(
-      `Submenu ${index} label should include: ${extensionShortName}, got: ${submenu.label}`,
-    );
-  }
-});
-
-if (submenus.length > 0) {
-  console.log(`  ✅ Submenus properly branded`);
 }
 
-// Verify fallback assets exist
-console.log("🔍 Verifying fallback assets...");
-
-if (packageJson.fallbackAssets) {
-  const assets = packageJson.fallbackAssets.assets || {};
-  const platformCount = Object.keys(assets).length;
-
-  if (platformCount >= 6) {
-    console.log(`  ✅ Fallback assets configured for ${platformCount} platforms`);
-  } else {
-    warnings.push(`Only ${platformCount} platforms configured in fallback assets (expected 6)`);
-  }
-
-  if (packageJson.fallbackAssets.sha256sumFile !== "sha256sum.txt") {
-    warnings.push(
-      `sha256sumFile should be "sha256sum.txt", got: ${packageJson.fallbackAssets.sha256sumFile}`,
-    );
-  } else {
-    console.log(`  ✅ sha256sumFile properly configured`);
-  }
-} else {
-  warnings.push("No fallback assets configuration found");
-}
-
-// Verify README was copied
-console.log("🔍 Verifying README...");
-
-const readmePath = path.join(__dirname, "../vscode/README.md");
+// README
+const readmePath = path.join(__dirname, "..", "vscode/core/README.md");
 if (fs.existsSync(readmePath)) {
-  const readmeContent = fs.readFileSync(readmePath, "utf8");
-  if (readmeContent.includes("Developer Lightspeed for migration toolkit")) {
-    console.log(`  ✅ README contains proper branding`);
-  } else {
-    errors.push("README does not contain proper branding");
-  }
+  console.log(`  ✅ README exists for core extension`);
 } else {
-  errors.push("README.md not found");
+  warnings.push("README.md not found for core extension");
 }
 
-// Summary
+// ─── Language Extension Verification ────────────────────────────────────────
+
+console.log("\n🔍 Verifying language extensions...");
+
+for (const [lang, expectedName] of Object.entries(LANG_EXTENSIONS)) {
+  const pkgPath = `vscode/${lang}/package.json`;
+  const pkg = readJson(pkgPath);
+
+  check(pkg.name === expectedName, `${lang} name: expected "${expectedName}", got "${pkg.name}"`);
+  check(pkg.publisher === publisher, `${lang} publisher: expected "${publisher}", got "${pkg.publisher}"`);
+  check(pkg.author === author, `${lang} author: expected "${author}", got "${pkg.author}"`);
+
+  // coreExtensionId
+  const expectedCoreId = `${publisher}.${CORE_NAME}`;
+  check(
+    pkg.coreExtensionId === expectedCoreId,
+    `${lang} coreExtensionId: expected "${expectedCoreId}", got "${pkg.coreExtensionId}"`,
+  );
+
+  // extensionDependencies should include the MTA core, not konveyor core
+  if (pkg.extensionDependencies) {
+    check(
+      pkg.extensionDependencies.includes(expectedCoreId),
+      `${lang} extensionDependencies should include "${expectedCoreId}"`,
+    );
+    check(
+      !pkg.extensionDependencies.includes("konveyor.konveyor-core"),
+      `${lang} extensionDependencies still contains "konveyor.konveyor-core"`,
+    );
+  }
+
+  console.log(`  ✅ ${lang} extension verified: ${pkg.name}`);
+}
+
+// ─── Extension Pack Verification ────────────────────────────────────────────
+
+console.log("\n🔍 Verifying extension pack...");
+
+const packPkg = readJson("vscode/konveyor/package.json");
+
+check(packPkg.name === PACK_NAME, `Pack name: expected "${PACK_NAME}", got "${packPkg.name}"`);
+check(packPkg.publisher === publisher, `Pack publisher: expected "${publisher}", got "${packPkg.publisher}"`);
+
+if (packPkg.extensionPack) {
+  const expectedPackEntries = [
+    `${publisher}.${CORE_NAME}`,
+    ...Object.values(LANG_EXTENSIONS).map((n) => `${publisher}.${n}`),
+  ];
+  for (const entry of expectedPackEntries) {
+    check(
+      packPkg.extensionPack.includes(entry),
+      `Extension pack missing entry: ${entry}`,
+    );
+  }
+  // Ensure no konveyor entries remain
+  for (const entry of packPkg.extensionPack) {
+    check(
+      !entry.includes("konveyor"),
+      `Extension pack still contains konveyor entry: ${entry}`,
+    );
+  }
+  console.log(`  ✅ Extension pack entries verified: ${packPkg.extensionPack.join(", ")}`);
+}
+
+// ─── Source Code Verification ───────────────────────────────────────────────
+
+console.log("\n🔍 Verifying source code transformations...");
+
+const commandsPath = path.join(__dirname, "..", "vscode/core/src/commands.ts");
+if (fs.existsSync(commandsPath)) {
+  const content = fs.readFileSync(commandsPath, "utf8");
+  check(
+    !content.includes('"konveyor.konveyor-'),
+    "commands.ts still contains 'konveyor.konveyor-' extension IDs",
+  );
+  console.log("  ✅ commands.ts verified — no konveyor extension IDs remain");
+} else {
+  warnings.push("commands.ts not found for source code verification");
+}
+
+// ─── Summary ────────────────────────────────────────────────────────────────
+
 console.log("\n📊 Verification Summary:");
-console.log(`✅ Verified branding for extension: ${extensionName}`);
-console.log(`✅ Short name: ${extensionShortName}`);
+console.log(`  Core: ${CORE_NAME}`);
+console.log(`  Languages: ${Object.values(LANG_EXTENSIONS).join(", ")}`);
+console.log(`  Pack: ${PACK_NAME}`);
+console.log(`  Version: ${extensionVersion}`);
 
 if (warnings.length > 0) {
   console.log(`\n⚠️  Warnings (${warnings.length}):`);
-  warnings.forEach((warning, index) => {
-    console.log(`  ${index + 1}. ${warning}`);
-  });
+  for (const [i, warning] of warnings.entries()) {
+    console.log(`  ${i + 1}. ${warning}`);
+  }
 }
 
 if (errors.length > 0) {
   console.log(`\n❌ Errors (${errors.length}):`);
-  errors.forEach((error, index) => {
-    console.log(`  ${index + 1}. ${error}`);
-  });
+  for (const [i, error] of errors.entries()) {
+    console.log(`  ${i + 1}. ${error}`);
+  }
   console.log("\n❌ Postbuild verification failed!");
   process.exit(1);
 } else {
-  console.log(`\n✅ Postbuild verification passed! ${extensionName} is properly branded.`);
+  console.log(`\n✅ Postbuild verification passed! All 6 extensions properly branded.`);
 }

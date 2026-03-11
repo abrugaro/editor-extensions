@@ -8,13 +8,13 @@
 #
 # Usage:
 #   ./scripts/update-upstream.sh                # Use current semanticRef from mta-build.yaml
-#   ./scripts/update-upstream.sh release-0.2    # Update to new semantic ref
+#   ./scripts/update-upstream.sh release-0.4    # Update to new semantic ref
 #   ./scripts/update-upstream.sh main
-#   ./scripts/update-upstream.sh v0.2.1
+#   ./scripts/update-upstream.sh v0.4.5
 #
 # The semantic ref is stored for documentation, but the SHA is what gets
 # checked out. This gives us immutability (SHAs don't move) with traceability
-# (we know it came from release-0.2).
+# (we know it came from release-0.4).
 
 set -e
 
@@ -38,9 +38,9 @@ if [ -z "$1" ]; then
     echo "Usage: $0 <semantic-ref>"
     echo ""
     echo "Examples:"
-    echo "  $0 release-0.2      # Get latest commit on release-0.2 branch"
+    echo "  $0 release-0.4      # Get latest commit on release-0.4 branch"
     echo "  $0 main             # Get latest commit on main branch"
-    echo "  $0 v0.2.1           # Get commit for v0.2.1 tag"
+    echo "  $0 v0.4.5           # Get commit for v0.4.5 tag"
     exit 1
   fi
 
