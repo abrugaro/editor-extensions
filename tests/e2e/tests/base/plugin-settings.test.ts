@@ -21,7 +21,7 @@ import { SCREENSHOTS_FOLDER } from '../../utilities/consts';
 
 const FILES_NAMES = ['CatalogService.java', 'InventoryNotificationMDB.java'];
 
-test.describe('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, () => {
+test.describe.serial('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, () => {
   let vscodeApp: VSCode;
   let tabManager: TabManager;
   const profileName = `plugins-settings-${generateRandomString()}`;
@@ -113,6 +113,7 @@ test.describe('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, () => {
   test.beforeEach(async function () {
     test.setTimeout(300000);
     const testName = test.info().title.replace(/[_"'\s]/g, '');
+    console.log(`Starting ${testName} at ${new Date()}`);
     await vscodeApp.getWindow().screenshot({
       path: `${SCREENSHOTS_FOLDER}/before-${testName}.png`,
     });

@@ -30,11 +30,15 @@ export class Configuration {
 
   public async setEnabledConfiguration(configuration: string, enabled: boolean) {
     const window = this.vsCode.getWindow();
-    const checkbox = window.getByLabel(configuration);
-    await window.screenshot({
-      path: `${SCREENSHOTS_FOLDER}/set-${configuration.replace(/[_"'\s]/g, '')}-to-${enabled}.png`,
-    });
-    await checkbox.setChecked(enabled);
+    try {
+      const checkbox = window.getByLabel(configuration);
+      await checkbox.setChecked(enabled);
+    } catch (error) {
+      await window.screenshot({
+        path: `${SCREENSHOTS_FOLDER}/error-set-${configuration.replace(/[_"'\s]/g, '')}-to-${enabled}.png`,
+      });
+      throw error;
+    }
   }
 
   public async setInputConfiguration(configuration: string, value: string) {
