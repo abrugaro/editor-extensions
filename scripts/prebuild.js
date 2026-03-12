@@ -377,6 +377,23 @@ async function generateFallbackAssets(pkg) {
     "win32-arm64": "windows-mta-analyzer-rpc",
   };
 
+  // Generate static fallback assets based on known URL patterns
+  // Used when server is unreachable at build time (e.g., VPN required)
+  // The extension will verify availability at runtime
+  function generateStaticFallbackAssets() {
+    // Extract version from URL (e.g., "8.1.0.CR2" from "MTA-8.1.0.CR2")
+    const versionMatch = FALLBACK_ASSETS_URL.match(/MTA-(\d+\.\d+\.\d+(?:\.[A-Za-z0-9]+)?)/);
+    const version = versionMatch ? versionMatch[1] : "8.1.0.CR2";
+
+    const assets = {};
+    for (const [vscodePlatform, mtaPlatform] of Object.entries(PLATFORM_MAPPING)) {
+      const binaryName = PLATFORM_BINARY_NAMES[vscodePlatform];
+      const file = `mta-${version}-analyzer-rpc-${mtaPlatform}.zip`;
+      assets[vscodePlatform] = { file, binaryName };
+    }
+    return assets;
+  }
+
   try {
     console.log(`    Fetching from: ${FALLBACK_ASSETS_URL}`);
 
@@ -391,8 +408,16 @@ async function generateFallbackAssets(pkg) {
     } catch (sha256Error) {
       if (isPreRelease) {
         console.warn(`    ⚠️  Failed to fetch SHA256SUM: ${sha256Error.message}`);
-        console.warn("    ⚠️  Pre-release build: skipping fallback assets (server unreachable)");
-        console.warn("    📦 Assets are bundled, so runtime downloads are not required");
+        console.warn("    ⚠️  Server unreachable (VPN required) - using static fallback config");
+
+        const assets = generateStaticFallbackAssets();
+        pkg.fallbackAssets = {
+          baseUrl: FALLBACK_ASSETS_URL,
+          sha256sumFile: "SHA256SUM",
+          assets,
+        };
+        console.log(`  ✅ Generated static fallback assets for ${Object.keys(assets).length} platforms`);
+        console.log("  📦 Extension will attempt to download assets at runtime");
         return pkg;
       }
       console.error(`    ❌ Failed to fetch SHA256SUM: ${sha256Error.message}`);
@@ -469,8 +494,16 @@ async function generateFallbackAssets(pkg) {
   } catch (error) {
     if (isPreRelease) {
       console.warn(`  ⚠️  Failed to generate fallback assets: ${error.message}`);
-      console.warn("  ⚠️  Pre-release build: skipping fallback assets (server unreachable)");
-      console.warn("  📦 Assets are bundled, so runtime downloads are not required");
+      console.warn("  ⚠️  Server unreachable (VPN required) - using static fallback config");
+
+      const assets = generateStaticFallbackAssets();
+      pkg.fallbackAssets = {
+        baseUrl: FALLBACK_ASSETS_URL,
+        sha256sumFile: "SHA256SUM",
+        assets,
+      };
+      console.log(`  ✅ Generated static fallback assets for ${Object.keys(assets).length} platforms`);
+      console.log("  📦 Extension will attempt to download assets at runtime");
       return pkg;
     }
     console.error(`  ❌ Failed to generate fallback assets: ${error.message}`);
