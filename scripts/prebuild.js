@@ -488,12 +488,22 @@ async function generateFallbackAssets(pkg) {
 function copyBrandingAssets() {
   console.log("🖼️  Copying branding assets...");
 
-  // 1. Sidebar icon → core extension
+  // 1. Sidebar icon → all extensions
   const iconSource = path.join(__dirname, "..", "assets/branding/sidebar-icons/icon.png");
-  const iconTarget = path.join(__dirname, "..", "vscode/core/resources/icon.png");
+  const iconTargets = [
+    "vscode/core/resources/icon.png",
+    "vscode/java/resources/icon.png",
+    "vscode/javascript/resources/icon.png",
+    "vscode/go/resources/icon.png",
+    "vscode/csharp/resources/icon.png",
+  ];
+
   if (fs.existsSync(iconSource)) {
-    fs.copyFileSync(iconSource, iconTarget);
-    console.log("  ✅ VSCode sidebar icon copied to core extension");
+    for (const target of iconTargets) {
+      const iconTarget = path.join(__dirname, "..", target);
+      fs.copyFileSync(iconSource, iconTarget);
+    }
+    console.log(`  ✅ VSCode sidebar icon copied to ${iconTargets.length} extensions`);
   } else {
     console.warn("  ⚠️  No sidebar icon found at: assets/branding/sidebar-icons/icon.png");
   }
