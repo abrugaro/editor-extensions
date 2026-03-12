@@ -2,6 +2,8 @@ import { Page } from '@playwright/test';
 import { VSCode } from './vscode.page';
 import { getOSInfo } from '../utilities/utils';
 import { expect } from '../fixtures/test-repo-fixture';
+import { SCREENSHOTS_FOLDER } from '../utilities/consts';
+import pathlib from 'path';
 
 export class TabManager {
   private readonly window: Page;
@@ -80,8 +82,15 @@ export class TabManager {
   public async focusTabByName(tabName: string): Promise<void> {
     const tabSelector = `.tab[role="tab"][data-resource-name="${tabName}"] .label-name`;
     const tab = this.window.locator(tabSelector);
-    await expect(tab).toBeVisible({ timeout: 10000 });
-    await tab.first().click();
+    try {
+      await expect(tab).toBeVisible({ timeout: 10000 });
+      await tab.first().click();
+    } catch (error) {
+      await this.window.screenshot({
+        path: pathlib.join(SCREENSHOTS_FOLDER, `last-error-focusing tab.png`),
+      });
+      throw error;
+    }
   }
 
   /**
