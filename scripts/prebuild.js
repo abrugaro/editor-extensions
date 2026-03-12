@@ -381,9 +381,10 @@ async function generateFallbackAssets(pkg) {
   // Used when server is unreachable at build time (e.g., VPN required)
   // The extension will verify availability at runtime
   function generateStaticFallbackAssets() {
-    // Extract version from URL (e.g., "8.1.0.CR2" from "MTA-8.1.0.CR2")
-    const versionMatch = FALLBACK_ASSETS_URL.match(/MTA-(\d+\.\d+\.\d+(?:\.[A-Za-z0-9]+)?)/);
-    const version = versionMatch ? versionMatch[1] : "8.1.0.CR2";
+    // Extract base version from URL (e.g., "8.1.0" from "MTA-8.1.0.CR2")
+    // The analyzer binaries use only the base version, not the release suffix
+    const versionMatch = FALLBACK_ASSETS_URL.match(/MTA-(\d+\.\d+\.\d+)/);
+    const version = versionMatch ? versionMatch[1] : "8.1.0";
 
     const assets = {};
     for (const [vscodePlatform, mtaPlatform] of Object.entries(PLATFORM_MAPPING)) {
