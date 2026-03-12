@@ -28,10 +28,26 @@ export class Configuration {
     await this.vsCode.waitDefault();
   }
 
+  public async searchConfig(configuration: string): Promise<void> {
+    const window = this.vsCode.getWindow();
+    const searchInput = window.locator('div.settings-header div.suggest-input-container');
+    await searchInput.waitFor();
+    const clearFilterLocator = window.getByRole('button', { name: 'Clear Settings Search Input' });
+    if (await clearFilterLocator.isEnabled()) {
+      await clearFilterLocator.click();
+    }
+    await searchInput.click();
+    await searchInput.pressSequentially(`${configuration}`);
+    await expect(window.getByLabel(configuration)).toBeVisible();
+  }
+
   public async setEnabledConfiguration(configuration: string, enabled: boolean) {
     const window = this.vsCode.getWindow();
     try {
       const checkbox = window.getByLabel(configuration);
+      if (!(await checkbox.isVisible())) {
+        await this.searchConfig(configuration);
+      }
       await checkbox.setChecked(enabled);
     } catch (error) {
       await window.screenshot({
@@ -48,6 +64,9 @@ export class Configuration {
 
   public async setDropdownConfiguration(configuration: string, value: string) {
     const selectLocator = this.vsCode.getWindow().locator(`select[aria-label="${configuration}"]`);
+    if (!(await selectLocator.isVisible())) {
+      await this.searchConfig(configuration);
+    }
     await selectLocator.selectOption({ value });
   }
 
