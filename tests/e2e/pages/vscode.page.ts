@@ -847,10 +847,17 @@ export abstract class VSCode {
     text: string | RegExp,
     options: { timeout: number } = { timeout: 10000 }
   ) {
-    await expect(
-      this.window.locator('.notification-list-item-message span', {
-        hasText: text,
-      })
-    ).toBeVisible({ timeout: options.timeout });
+    try {
+      await expect(
+        this.window.locator('.notification-list-item-message span', {
+          hasText: text,
+        })
+      ).toBeVisible({ timeout: options.timeout });
+    } catch (error) {
+      await this.window.screenshot({
+        path: pathlib.join(SCREENSHOTS_FOLDER, `last-notification-error.png`),
+      });
+      throw error;
+    }
   }
 }
