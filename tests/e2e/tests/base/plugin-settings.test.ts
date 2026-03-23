@@ -188,6 +188,7 @@ test.describe.serial('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, (
     await configurationPage.setEnabledConfiguration(acceptOnSaveSettingKey, false);
     await vscodeApp.waitDefault();
     await configurationPage.setEnabledConfiguration(analyzeOnSaveSettingKey, false);
+    await vscodeApp.openAnalysisView();
     await vscodeApp.setListKindAndSort('files', 'ascending');
     await vscodeApp.searchAndRequestAction(
       FILES_NAMES[1],
