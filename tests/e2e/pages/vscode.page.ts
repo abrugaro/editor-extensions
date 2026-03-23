@@ -107,9 +107,9 @@ export abstract class VSCode {
 
   public async startServer(): Promise<void> {
     await this.openAnalysisView();
-    const analysisView = await this.getView(KAIViews.analysisView);
 
     try {
+      const analysisView = await this.getView(KAIViews.analysisView);
       // Check if server is already running
       const stopButton = analysisView.getByRole('button', { name: 'Stop' });
       const isServerRunning = await stopButton.isVisible();
@@ -129,6 +129,9 @@ export abstract class VSCode {
       }
     } catch (error) {
       console.log('Error starting server:', error);
+      await this.window.screenshot({
+        path: pathlib.join(SCREENSHOTS_FOLDER, `error-starting-server.png`),
+      });
       throw error;
     }
   }
