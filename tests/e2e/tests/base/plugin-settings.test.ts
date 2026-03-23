@@ -197,7 +197,9 @@ test.describe.serial('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, (
     );
     await tabManager.saveTabFile(FILES_NAMES[1]);
     const rejectChangesBtn = vscodeApp.getWindow().getByText('Reject All Changes');
+    // the diff should still be there when auto accept on save is disabled
     await rejectChangesBtn.click();
+    await tabManager.saveTabFile(FILES_NAMES[1]);
     await tabManager.closeTabByName(FILES_NAMES[1]);
     await vscodeApp.executeTerminalCommand('git status', 'Changes not staged for commit', false);
   });
