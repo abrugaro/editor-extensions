@@ -26,6 +26,13 @@ export class Configuration {
     await searchInput.click();
     await searchInput.pressSequentially(`@ext:${extensionId}`);
     await this.vsCode.waitDefault();
+
+    const openModalButton = window.getByRole('button', {
+      name: 'Open Modal Editor in Main Window',
+    });
+    if (await openModalButton.isVisible()) {
+      await openModalButton.click();
+    }
   }
 
   public async searchConfig(configuration: string): Promise<void> {

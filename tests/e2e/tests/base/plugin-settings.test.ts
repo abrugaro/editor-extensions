@@ -114,6 +114,7 @@ test.describe.serial('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, (
     test.setTimeout(300000);
     const testName = test.info().title.replace(/[_"'\s]/g, '');
     console.log(`Starting ${testName} at ${new Date()}`);
+
     await vscodeApp.getWindow().screenshot({
       path: `${SCREENSHOTS_FOLDER}/before-${testName}.png`,
     });
@@ -180,6 +181,9 @@ test.describe.serial('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, (
   });
 
   test('Disable "Auto Accept on Save" setting', async () => {
+    // Needed to avoid grabbing things from previous tests
+    await vscodeApp.executeTerminalCommand('git checkout .');
+
     const configurationPage = await Configuration.open(vscodeApp);
     await configurationPage.setEnabledConfiguration(acceptOnSaveSettingKey, false);
     await vscodeApp.waitDefault();
@@ -195,12 +199,10 @@ test.describe.serial('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, (
       ResolutionAction.ReviewInEditor
     );
     await tabManager.saveTabFile(FILES_NAMES[1]);
+    const rejectChangesBtn = vscodeApp.getWindow().getByText('Reject All Changes');
+    await rejectChangesBtn.click();
     await tabManager.closeTabByName(FILES_NAMES[1]);
-    await vscodeApp.executeTerminalCommand(
-      'git status --short',
-      new RegExp(`M.*${FILES_NAMES[1].replace('.', '\\.')}`),
-      false
-    );
+    await vscodeApp.executeTerminalCommand('git status', 'Changes not staged for commit', false);
   });
 
   test('Exclude diagnostic sources in agent mode', async ({ testRepoData }) => {

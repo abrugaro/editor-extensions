@@ -678,6 +678,7 @@ export abstract class VSCode {
     }
     if (!(await this.window.getByRole('tab', { name: 'Terminal' }).isVisible())) {
       await this.executeQuickCommand(`Terminal: Create New Terminal`);
+      console.log('VSCodePage.executeTerminalCommand: creating new terminal...');
     }
     const terminalContainerLocator = this.window.locator('.terminal-widget-container').last();
     await expect(terminalContainerLocator).toBeVisible();
@@ -691,7 +692,15 @@ export abstract class VSCode {
       if (outputShouldBeVisible) {
         await expect(this.window.getByText(expectedOutput).first()).toBeVisible();
       } else {
-        await expect(this.window.getByText(expectedOutput).first()).not.toBeVisible();
+        try {
+          await expect(this.window.getByText(expectedOutput).first()).not.toBeVisible();
+        } catch (error) {
+          const element = this.window.getByText(expectedOutput).first();
+          const html = await element.evaluate((el) => el.outerHTML);
+          console.log('Unexpected visible output in command:');
+          console.log(html);
+          throw error;
+        }
       }
     }
 
