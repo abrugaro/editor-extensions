@@ -31,6 +31,13 @@ export class TabManager {
    */
   public async saveTabFile(tabName: string): Promise<void> {
     await this.ensureTabIsActive(tabName);
+    // Find the editor group containing the tab and click on its editor to ensure focus
+    const tabSelector = `.tab[role="tab"][data-resource-name="${tabName}"]`;
+    const editorGroup = this.window
+      .locator(tabSelector)
+      .locator('xpath=ancestor::div[contains(@class, "editor-group-container")]');
+    const editor = editorGroup.locator('.monaco-editor .view-lines').first();
+    await editor.click();
     const modifier = getOSInfo() === 'macOS' ? 'Meta' : 'Control';
     await this.window.keyboard.press(`${modifier}+S`, { delay: 500 });
   }
