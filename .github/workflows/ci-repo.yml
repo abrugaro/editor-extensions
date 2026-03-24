@@ -66,7 +66,6 @@ jobs:
           scripts/validate-extension-names.sh
 
       - name: Lint sources
-        if: false # TODO abrugaro remove
         run: |
           npm run lint
 
@@ -79,10 +78,10 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: linux
-          #- os: macos-latest# TODO abrugaro remove
-          #            arch: macos
-          #- os: windows-latest
-          #arch: windows
+          - os: macos-latest
+            arch: macos
+          - os: windows-latest
+            arch: windows
       max-parallel: 3
 
     steps:
@@ -114,10 +113,10 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: linux
-          #- os: macos-latest # TODO abrugaro remove
-          #            arch: macos
-          #- os: windows-latest
-          #arch: windows
+          - os: macos-latest
+            arch: macos
+          - os: windows-latest
+            arch: windows
 
     steps:
       - name: Checkout code
@@ -144,8 +143,7 @@ jobs:
 
       # Run tests on Linux
       - name: Run tests (Linux)
-        #if: matrix.arch == 'linux'
-        if: false # TODO abrugaro remove
+        if: matrix.arch == 'linux'
         run: xvfb-run -a npm test
 
       # Run tests on macOS
