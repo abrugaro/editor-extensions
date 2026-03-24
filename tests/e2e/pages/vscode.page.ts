@@ -685,6 +685,9 @@ export abstract class VSCode {
     }
     const terminalContainerLocator = this.window.locator('.terminal-widget-container').last();
     await expect(terminalContainerLocator).toBeVisible();
+    // Focus the terminal textarea to ensure keyboard input is received
+    const terminalInput = terminalContainerLocator.locator('textarea.xterm-helper-textarea');
+    await terminalInput.focus();
     await this.window.keyboard.type(command);
     await this.window.keyboard.press('Enter');
     if (expectedOutput) {
