@@ -202,6 +202,7 @@ test.describe.serial('Plugin Settings - Analyze on Save', { tag: ['@tier1'] }, (
     await tabManager.saveTabFile(FILES_NAMES[1]);
     await tabManager.closeTabByName(FILES_NAMES[1]);
     await vscodeApp.executeTerminalCommand('git status', 'Changes not staged for commit', false);
+    await vscodeApp.executeQuickCommand('View: Close All Editors');
   });
 
   test('Exclude diagnostic sources in agent mode', async ({ testRepoData }) => {
