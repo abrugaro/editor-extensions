@@ -80,14 +80,16 @@ export class TabManager {
    * @param tabName The name of the file/tab to focus.
    */
   public async focusTabByName(tabName: string): Promise<void> {
-    const tabSelector = `.tab[role="tab"][data-resource-name="${tabName}"] .label-name`;
+    const tabSelector = `.tab[role="tab"][data-resource-name="${tabName}"]`;
     const tab = this.window.locator(tabSelector);
     try {
-      await expect(tab).toBeVisible({ timeout: 10000 });
+      await expect(tab.locator('.label-name')).toBeVisible({ timeout: 10000 });
       await tab.first().click();
+      // Verify tab is now active after clicking
+      await expect(tab.first()).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     } catch (error) {
       await this.window.screenshot({
-        path: pathlib.join(SCREENSHOTS_FOLDER, `last-error-focusing tab.png`),
+        path: pathlib.join(SCREENSHOTS_FOLDER, `last-error-focusing-tab.png`),
       });
       throw error;
     }
