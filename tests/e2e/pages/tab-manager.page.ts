@@ -36,8 +36,9 @@ export class TabManager {
     const editorGroup = this.window
       .locator(tabSelector)
       .locator('xpath=ancestor::div[contains(@class, "editor-group-container")]');
-    const editor = editorGroup.locator('.monaco-editor .view-lines').first();
-    await editor.click();
+    // Focus the editor's textarea to ensure keyboard input goes to the correct editor
+    const editorTextarea = editorGroup.locator('.monaco-editor textarea').first();
+    await editorTextarea.focus();
     const modifier = getOSInfo() === 'macOS' ? 'Meta' : 'Control';
     await this.window.keyboard.press(`${modifier}+S`, { delay: 500 });
   }
