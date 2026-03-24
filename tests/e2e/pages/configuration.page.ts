@@ -55,6 +55,7 @@ export class Configuration {
       if (!(await checkbox.isVisible())) {
         await this.searchConfig(configuration);
       }
+      await checkbox.scrollIntoViewIfNeeded();
       await checkbox.setChecked(enabled);
     } catch (error) {
       await window.screenshot({
