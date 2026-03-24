@@ -31,16 +31,8 @@ export class TabManager {
    */
   public async saveTabFile(tabName: string): Promise<void> {
     await this.ensureTabIsActive(tabName);
-    // Find the editor group containing the tab and click on its editor to ensure focus
-    const tabSelector = `.tab[role="tab"][data-resource-name="${tabName}"]`;
-    const editorGroup = this.window
-      .locator(tabSelector)
-      .locator('xpath=ancestor::div[contains(@class, "editor-group-container")]');
-    // Focus the editor's textarea to ensure keyboard input goes to the correct editor
-    const editorTextarea = editorGroup.locator('.monaco-editor textarea').first();
-    await editorTextarea.focus();
-    const modifier = getOSInfo() === 'macOS' ? 'Meta' : 'Control';
-    await this.window.keyboard.press(`${modifier}+S`, { delay: 500 });
+    // Use VSCode command to save, which is more reliable than Ctrl+S for diff editors
+    await this.vsCode.executeQuickCommand('File: Save');
   }
 
   /**
