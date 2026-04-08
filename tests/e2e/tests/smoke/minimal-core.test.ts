@@ -40,6 +40,7 @@ test.describe.serial('Minimal core smoke flow', { tag: ['@tier0', '@smoke'] }, (
   });
 
   test('Start server', async () => {
+    await vscodeApp.getWindow().reload();
     await vscodeApp.startServer();
   });
 
