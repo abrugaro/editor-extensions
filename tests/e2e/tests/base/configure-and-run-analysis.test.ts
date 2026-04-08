@@ -35,6 +35,7 @@ test.describe.serial('Configure extension and run analysis', { tag: ['@tier0'] }
   });
 
   test('Start server', async () => {
+    await vscodeApp.getWindow().reload();
     await vscodeApp.startServer();
   });
 
