@@ -107,6 +107,7 @@ export abstract class VSCode {
   }
 
   public async startServer(): Promise<void> {
+    await this.getWindow().reload();
     await this.openAnalysisView();
 
     try {

@@ -10,6 +10,7 @@ import {
   loadLlemulatorResponses,
   buildKaiResponse,
 } from '../../utilities/llemulator.utils';
+import { SCREENSHOTS_FOLDER } from '../../utilities/consts';
 
 // Invalid GenAI provider config to trigger connection error
 const INVALID_GENAI_CONFIG = `---
@@ -68,6 +69,12 @@ test.describe.serial(
       await expect(
         analysisView.getByText('Failed to establish connection to the model')
       ).toBeVisible({ timeout: 30000 });
+    });
+
+    test.beforeEach(async function () {
+      test.setTimeout(300000);
+      const testName = test.info().title.replace(/[_"'\s]/g, '');
+      console.log(`Starting ${testName} at ${new Date()}`);
     });
 
     test('Hub LLM proxy configuration and notifications', async () => {

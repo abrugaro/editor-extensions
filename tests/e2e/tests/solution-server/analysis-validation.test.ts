@@ -25,7 +25,7 @@ test.describe.serial(
 
     test.beforeAll(async ({ testRepoData }) => {
       const repoInfo = testRepoData['coolstore'];
-      test.setTimeout(600000);
+      test.setTimeout(600_000);
 
       if (getDefaultProviderConfig() === LLEMULATOR_PROVIDER) {
         await loadLlemulatorResponses({
