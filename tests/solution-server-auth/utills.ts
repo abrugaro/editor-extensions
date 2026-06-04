@@ -1,6 +1,5 @@
 export interface MCPConfig {
   url: string;
-  realm: string;
   username: string;
   password: string;
   insecure: boolean;
@@ -48,12 +47,8 @@ export function validateSolutionServerConfig(url?: string): MCPConfig {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   }
 
-  // Use TEST_HUB_REALM if available, otherwise default to 'tackle'
-  const realm = process.env.TEST_HUB_REALM || process.env.SOLUTION_SERVER_REALM || 'tackle';
-
   return {
     url: finalUrl,
-    realm,
     username: process.env.TEST_HUB_USERNAME || '',
     password: process.env.TEST_HUB_PASSWORD || '',
     insecure,

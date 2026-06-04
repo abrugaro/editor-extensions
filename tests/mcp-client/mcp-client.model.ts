@@ -85,7 +85,7 @@ export class MCPClient {
 
     const authManager = new AuthenticationManager(
       fullUrl,
-      config.realm,
+      '', // realm parameter kept for API compat, unused in Hub PAT flow
       config.username,
       config.password,
       config.insecure

@@ -5,26 +5,27 @@ set -e  # Exit on error
 # Configuration
 HUB_URL="${HUB_URL:-https://192.168.49.2}"
 USERNAME="${USERNAME:-admin}" # notsecret
-PASSWORD="${PASSWORD:-Passw0rd!}" # notsecret
+PASSWORD="${PASSWORD:-admin}" # notsecret
 
 echo "=== Seeding Konveyor Hub at ${HUB_URL} ==="
 
 # Authenticate and get token
-echo "Authenticating..."
-AUTH_RESPONSE=$(curl -k -s -X POST \
-  "${HUB_URL}/hub/auth/login" \
+echo "Authenticating (creating Hub PAT)..."
+PAT_RESPONSE=$(curl -k -s -X POST \
+  "${HUB_URL}/hub/auth/tokens" \
   -H "Content-Type: application/json" \
-  -d "{\"user\": \"${USERNAME}\", \"password\": \"${PASSWORD}\"}")
+  -u "${USERNAME}:${PASSWORD}" \
+  -d '{"lifespan": 1}')
 
-TOKEN=$(echo "$AUTH_RESPONSE" | jq -r '.token // empty')
+TOKEN=$(echo "$PAT_RESPONSE" | jq -r '.token // empty')
 
 if [ -z "$TOKEN" ]; then
-  echo "ERROR: Failed to authenticate"
-  echo "Response: $AUTH_RESPONSE"
+  echo "ERROR: Failed to create Hub PAT"
+  echo "Response: $PAT_RESPONSE"
   exit 1
 fi
 
-echo "✓ Authentication successful"
+echo "✓ Authentication successful (PAT created)"
 
 # 1. Get or Create Analysis Profile "Coolstore"
 echo ""

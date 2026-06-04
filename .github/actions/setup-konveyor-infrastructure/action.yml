@@ -9,7 +9,7 @@ inputs:
   admin_password:
     description: "Password for the admin user"
     required: false
-    default: "Passw0rd!"
+    default: "admin"
   llm_model:
     description: "LLM model to use"
     required: false
@@ -181,64 +181,38 @@ runs:
       env:
         ADMIN_PASSWORD: ${{ inputs.admin_password }}
         NAMESPACE: ${{ inputs.namespace }}
+        HUB_URL: ${{ steps.wait_ingress.outputs.hub_url }}
       run: |
-        echo "=== Configuring Hub admin credentials ==="
+        echo "=== Waiting for Hub auth to be ready ==="
 
-        echo -n "Waiting for admin user in tackle realm..."
-        ADMIN_EXISTS=false
-        ADMIN_SECRET=$(kubectl get secret tackle-keycloak-sso -n ${NAMESPACE} -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
-
+        # Hub seeds admin:admin by default (internal/auth/seed/users.yaml).
+        # Poll until PAT creation works — this confirms Hub auth is functional.
+        echo -n "Waiting for Hub PAT endpoint..."
+        HUB_READY=false
         for i in $(seq 1 30); do
-          # Get admin token
-          ADMIN_TOKEN_RESPONSE=$(kubectl exec -n ${NAMESPACE} deployment/tackle-hub -- curl -s -X POST \
-            http://tackle-keycloak-sso:8080/auth/realms/master/protocol/openid-connect/token \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "grant_type=password&client_id=admin-cli&username=admin&password=$ADMIN_SECRET" 2>/dev/null || echo "{}")
-
-          if echo "$ADMIN_TOKEN_RESPONSE" | grep -q "access_token"; then
-            ADMIN_TOKEN=$(echo "$ADMIN_TOKEN_RESPONSE" | jq -r '.access_token' 2>/dev/null || true)
-            if [ -n "$ADMIN_TOKEN" ]; then
-              # Check for admin user in tackle realm
-              USERS_RESPONSE=$(kubectl exec -n ${NAMESPACE} deployment/tackle-hub -- curl -s \
-                "http://tackle-keycloak-sso:8080/auth/admin/realms/tackle/users?username=admin" \
-                -H "Authorization: Bearer $ADMIN_TOKEN" 2>/dev/null || echo "[]") # notsecret
-
-              if echo "$USERS_RESPONSE" | grep -q '"username":"admin"'; then
-                echo " found"
-                ADMIN_EXISTS=true
-
-                # Get admin user ID
-                ADMIN_USER_ID=$(echo "$USERS_RESPONSE" | jq -r '.[0].id // empty' 2>/dev/null || true)
-                break
-              fi
-            fi
+          HTTP_CODE=$(curl -s -k -o /dev/null -w "%{http_code}" \
+            -X POST "${HUB_URL}/hub/auth/tokens" \
+            -H "Content-Type: application/json" \
+            -u "admin:${ADMIN_PASSWORD}" \
+            -d '{"lifespan": 1}' 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo " ready (HTTP $HTTP_CODE)"
+            HUB_READY=true
+            break
           fi
           echo -n "."
           sleep 5
         done
 
-        if [ "$ADMIN_EXISTS" != true ]; then
-          echo " timeout (admin user may not exist yet)"
+        if [ "$HUB_READY" != "true" ]; then
+          echo ""
+          echo "Timeout waiting for Hub auth endpoint (last HTTP: $HTTP_CODE)"
+          echo "Hub logs:"
+          kubectl logs -n "${NAMESPACE}" deployment/tackle-hub --tail=50 || true
           exit 1
         fi
 
-        echo "Got Keycloak admin token and user ID: $ADMIN_USER_ID"
-
-        # Clear required actions
-        kubectl exec -n ${NAMESPACE} deployment/tackle-hub -- curl -s -X PUT \
-          "http://tackle-keycloak-sso:8080/auth/admin/realms/tackle/users/$ADMIN_USER_ID" \
-          -H "Authorization: Bearer $ADMIN_TOKEN" \
-          -H "Content-Type: application/json" \
-          -d '{"requiredActions": []}' &>/dev/null
-
-        # Reset password
-        kubectl exec -n ${NAMESPACE} deployment/tackle-hub -- curl -s -X PUT \
-          "http://tackle-keycloak-sso:8080/auth/admin/realms/tackle/users/$ADMIN_USER_ID/reset-password" \
-          -H "Authorization: Bearer $ADMIN_TOKEN" \
-          -H "Content-Type: application/json" \
-          -d "{\"type\": \"password\", \"value\": \"${ADMIN_PASSWORD}\", \"temporary\": false}" &>/dev/null
-
-        echo "✓ Admin user configured (admin:${ADMIN_PASSWORD})"
+        echo "✓ Hub admin ready (admin:admin)"
 
     - name: Seed Hub with Test Data
       shell: bash
@@ -298,55 +272,40 @@ runs:
         ADMIN_PASSWORD: ${{ inputs.admin_password }}
         NAMESPACE: ${{ inputs.namespace }}
       run: |
-        echo "=== Testing llemulator access through LLM proxy ==="
+        echo "=== Testing llemulator access through Hub LLM proxy ==="
 
-        # Get JWT token from Keycloak for admin user
-        echo "Getting JWT token from Keycloak..."
-        TOKEN_RESPONSE=$(curl -s -k -X POST "${HUB_URL}/auth/realms/tackle/protocol/openid-connect/token" \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          -d "grant_type=password&client_id=backend&username=admin&password=${ADMIN_PASSWORD}")
-
-        JWT_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty')
-        if [ -z "$JWT_TOKEN" ]; then
-          echo "Failed to get JWT token. Response: $TOKEN_RESPONSE"
-          echo "Skipping LLM proxy verification (auth not configured for direct access)"
-          exit 0
-        fi
-        echo "✓ Got JWT token"
-
-        # Get the llm-proxy service port
-        LLM_PROXY_PORT=$(kubectl get svc llm-proxy -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].port}')
-        echo "LLM Proxy service port: ${LLM_PROXY_PORT}"
-
-        # Port-forward to llm-proxy using the correct port
-        kubectl port-forward -n ${NAMESPACE} svc/llm-proxy 8090:${LLM_PROXY_PORT} &
-        PF_PID=$!
-
-        # Wait for port-forward to be ready
-        for i in {1..30}; do
-          if curl -s http://localhost:8090/health > /dev/null 2>&1; then
-            echo "LLM Proxy port-forward is ready"
-            break
-          fi
-          echo "Waiting for LLM proxy port-forward... ($i/30)"
-          sleep 2
-        done
-
-        # Test LLM proxy can reach llemulator with JWT token
-        RESPONSE=$(curl -s -X POST "http://localhost:8090/v1/chat/completions" \
+        # Create a Hub PAT using Basic Auth (admin:admin by default)
+        echo "Creating Hub PAT for LLM proxy test..."
+        PAT_RESPONSE=$(curl -s -k -X POST "${HUB_URL}/hub/auth/tokens" \
           -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${JWT_TOKEN}" \
-          -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "test via proxy"}]}') # notsecret
+          -u "admin:${ADMIN_PASSWORD}" \
+          -d '{"lifespan": 1}')
+
+        HUB_TOKEN=$(echo "$PAT_RESPONSE" | jq -r '.token // empty')
+        if [ -z "$HUB_TOKEN" ]; then
+          echo "Failed to create Hub PAT. Response: $PAT_RESPONSE"
+          echo "LLM proxy verification failed: could not create Hub PAT"
+          exit 1
+        fi
+        echo "✓ Got Hub PAT"
+
+        # Route LLM proxy request through Hub's reverse proxy
+        # operator#567 routes llm-proxy through /hub/services/llm-proxy/...
+        RESPONSE=$(curl -s -k -X POST \
+          "${HUB_URL}/hub/services/llm-proxy/v1/chat/completions" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${HUB_TOKEN}" \
+          -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "test via proxy"}]}')
 
         echo "LLM Proxy response: $RESPONSE"
 
-        kill $PF_PID 2>/dev/null || true
-
         if echo "$RESPONSE" | grep -q "choices"; then
-          echo "✓ LLM Proxy can reach llemulator successfully"
+          echo "✓ LLM Proxy reachable via Hub reverse proxy"
         else
-          echo "✗ LLM Proxy failed to reach llemulator"
+          echo "✗ LLM Proxy failed via Hub reverse proxy"
+          echo "Hub logs:"
+          kubectl logs -n "${NAMESPACE}" deployment/tackle-hub --tail=50 || true
           echo "LLM Proxy logs:"
-          kubectl logs -n ${NAMESPACE} deployment/llm-proxy --tail=50
+          kubectl logs -n "${NAMESPACE}" deployment/llm-proxy --tail=50 || true
           exit 1
         fi

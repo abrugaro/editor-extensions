@@ -1,4 +1,4 @@
-export interface KeycloakCredentials {
+export interface HubCredentials {
   username: string;
   password: string;
 }
