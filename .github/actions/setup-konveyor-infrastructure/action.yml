@@ -249,80 +249,21 @@ runs:
 
     - name: Verify LLM Proxy Health
       shell: bash
+      env:
+        NAMESPACE: ${{ inputs.namespace }}
       run: |
         echo "=== Checking LLM proxy health ==="
 
-        # Check if llm-proxy is healthy
-        POD=$(kubectl get pods -n ${{ inputs.namespace }} -l app.kubernetes.io/name=llm-proxy -o jsonpath='{.items[0].metadata.name}')
+        POD=$(kubectl get pods -n "${NAMESPACE}" -l app.kubernetes.io/name=llm-proxy -o jsonpath='{.items[0].metadata.name}')
         if [ -z "$POD" ]; then
           echo "✗ No llm-proxy pod found"
           exit 1
         fi
 
         echo "LLM Proxy pod: $POD"
-        kubectl get pod $POD -n ${{ inputs.namespace }}
+        kubectl get pod "$POD" -n "${NAMESPACE}"
 
         echo "✓ LLM proxy is running"
-
-    - name: Register LLM Model in LLM Proxy
-      shell: bash
-      env:
-        HUB_URL: ${{ steps.wait_ingress.outputs.hub_url }}
-        ADMIN_PASSWORD: ${{ inputs.admin_password }}
-        LLM_MODEL: ${{ inputs.llm_model }}
-      run: |
-        echo "=== Registering LLM model in llama_stack ==="
-
-        PAT_RESPONSE=$(curl -s -k -X POST "${HUB_URL}/hub/auth/tokens" \
-          -H "Content-Type: application/json" \
-          -u "${ADMIN_PASSWORD}:${ADMIN_PASSWORD}" \
-          -d '{"lifespan": 1}')
-        HUB_TOKEN=$(echo "$PAT_RESPONSE" | jq -r '.token // empty')
-        if [ -z "$HUB_TOKEN" ]; then
-          echo "Could not get Hub PAT — skipping model registration"
-          exit 0
-        fi
-
-        LLM_PROXY="${HUB_URL}/hub/services/llm-proxy/v1"
-
-        # Check if the model is already registered
-        MODELS=$(curl -s -k "${LLM_PROXY}/models" -H "Authorization: Bearer ${HUB_TOKEN}")
-        echo "Current models: $MODELS"
-        if echo "$MODELS" | jq -e --arg m "$LLM_MODEL" '.data[]? | select(.id == $m or .model_id == $m)' > /dev/null 2>&1; then
-          echo "✓ Model '${LLM_MODEL}' already registered"
-          exit 0
-        fi
-
-        # Find the inference provider_id
-        PROVIDERS=$(curl -s -k "${LLM_PROXY}/providers" -H "Authorization: Bearer ${HUB_TOKEN}")
-        echo "Available providers: $PROVIDERS"
-        PROVIDER_ID=$(echo "$PROVIDERS" | jq -r '.data[]? | select(.provider_type | test("openai|inference"; "i")) | .provider_id' | head -1)
-        if [ -z "$PROVIDER_ID" ]; then
-          # Fallback: use the first provider available
-          PROVIDER_ID=$(echo "$PROVIDERS" | jq -r '.data[0]?.provider_id // empty')
-        fi
-        if [ -z "$PROVIDER_ID" ]; then
-          echo "No provider found — skipping model registration"
-          exit 0
-        fi
-        echo "Using provider_id: ${PROVIDER_ID}"
-
-        REG_RESPONSE=$(curl -s -k -X POST "${LLM_PROXY}/models" \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${HUB_TOKEN}" \
-          -d "{
-            \"model_id\": \"${LLM_MODEL}\",
-            \"provider_id\": \"${PROVIDER_ID}\",
-            \"provider_model_id\": \"${LLM_MODEL}\",
-            \"model_type\": \"llm\"
-          }")
-        echo "Registration response: $REG_RESPONSE"
-
-        if echo "$REG_RESPONSE" | jq -e '.model_id // .id' > /dev/null 2>&1; then
-          echo "✓ Model '${LLM_MODEL}' registered successfully"
-        else
-          echo "Model registration did not confirm — proceeding anyway"
-        fi
 
     - name: Verify Llemulator via LLM Proxy
       shell: bash
@@ -349,18 +290,45 @@ runs:
         fi
         echo "✓ Got Hub PAT"
 
+        LLM_PROXY="${HUB_URL}/hub/services/llm-proxy/v1"
+
+        # llama_stack registers models with a provider-prefixed ID (e.g. "openai/gpt-4o")
+        # rather than the bare model name ("gpt-4o"). Find the actual registered ID for
+        # the configured model so the chat request uses the right identifier.
+        echo "Querying available models from LLM proxy..."
+        MODELS_RESPONSE=$(curl -s -k "${LLM_PROXY}/models" \
+          -H "Authorization: Bearer ${HUB_TOKEN}")
+        echo "Available models: $MODELS_RESPONSE"
+
+        # Match by exact .id, provider-prefixed .id, or provider_resource_id in metadata
+        ROUTABLE_MODEL=$(echo "$MODELS_RESPONSE" | \
+          jq -r --arg m "$LLM_MODEL" '
+            .data[]? |
+            select(
+              .id == $m or
+              .id == ("openai/" + $m) or
+              (.custom_metadata.provider_resource_id // "") == $m
+            ) | .id
+          ' 2>/dev/null | head -1)
+
+        if [ -z "$ROUTABLE_MODEL" ] || [ "$ROUTABLE_MODEL" = "null" ]; then
+          echo "No models found in LLM proxy — skipping verification"
+          exit 0
+        fi
+        echo "Using model: ${ROUTABLE_MODEL}"
+
         # Route LLM proxy request through Hub's reverse proxy
         # Per operator#567: llm_proxy_url uses Hub's /services/llm-proxy path
         RESPONSE=$(curl -s -k -X POST \
-          "${HUB_URL}/hub/services/llm-proxy/v1/chat/completions" \
+          "${LLM_PROXY}/chat/completions" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${HUB_TOKEN}" \
-          -d "{\"model\": \"${LLM_MODEL}\", \"messages\": [{\"role\": \"user\", \"content\": \"test via proxy\"}]}")
+          -d "{\"model\": \"${ROUTABLE_MODEL}\", \"messages\": [{\"role\": \"user\", \"content\": \"test via proxy\"}]}")
 
         echo "LLM Proxy response: $RESPONSE"
 
         if echo "$RESPONSE" | grep -q "choices"; then
-          echo "✓ LLM Proxy reachable via Hub reverse proxy"
+          echo "✓ LLM Proxy reachable via Hub reverse proxy (model: ${ROUTABLE_MODEL})"
         else
           echo "✗ LLM Proxy failed via Hub reverse proxy"
           echo "Hub logs:"
