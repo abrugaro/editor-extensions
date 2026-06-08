@@ -264,12 +264,73 @@ runs:
 
         echo "✓ LLM proxy is running"
 
+    - name: Register LLM Model in LLM Proxy
+      shell: bash
+      env:
+        HUB_URL: ${{ steps.wait_ingress.outputs.hub_url }}
+        ADMIN_PASSWORD: ${{ inputs.admin_password }}
+        LLM_MODEL: ${{ inputs.llm_model }}
+      run: |
+        echo "=== Registering LLM model in llama_stack ==="
+
+        PAT_RESPONSE=$(curl -s -k -X POST "${HUB_URL}/hub/auth/tokens" \
+          -H "Content-Type: application/json" \
+          -u "${ADMIN_PASSWORD}:${ADMIN_PASSWORD}" \
+          -d '{"lifespan": 1}')
+        HUB_TOKEN=$(echo "$PAT_RESPONSE" | jq -r '.token // empty')
+        if [ -z "$HUB_TOKEN" ]; then
+          echo "Could not get Hub PAT — skipping model registration"
+          exit 0
+        fi
+
+        LLM_PROXY="${HUB_URL}/hub/services/llm-proxy/v1"
+
+        # Check if the model is already registered
+        MODELS=$(curl -s -k "${LLM_PROXY}/models" -H "Authorization: Bearer ${HUB_TOKEN}")
+        echo "Current models: $MODELS"
+        if echo "$MODELS" | jq -e --arg m "$LLM_MODEL" '.data[]? | select(.id == $m or .model_id == $m)' > /dev/null 2>&1; then
+          echo "✓ Model '${LLM_MODEL}' already registered"
+          exit 0
+        fi
+
+        # Find the inference provider_id
+        PROVIDERS=$(curl -s -k "${LLM_PROXY}/providers" -H "Authorization: Bearer ${HUB_TOKEN}")
+        echo "Available providers: $PROVIDERS"
+        PROVIDER_ID=$(echo "$PROVIDERS" | jq -r '.data[]? | select(.provider_type | test("openai|inference"; "i")) | .provider_id' | head -1)
+        if [ -z "$PROVIDER_ID" ]; then
+          # Fallback: use the first provider available
+          PROVIDER_ID=$(echo "$PROVIDERS" | jq -r '.data[0]?.provider_id // empty')
+        fi
+        if [ -z "$PROVIDER_ID" ]; then
+          echo "No provider found — skipping model registration"
+          exit 0
+        fi
+        echo "Using provider_id: ${PROVIDER_ID}"
+
+        REG_RESPONSE=$(curl -s -k -X POST "${LLM_PROXY}/models" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${HUB_TOKEN}" \
+          -d "{
+            \"model_id\": \"${LLM_MODEL}\",
+            \"provider_id\": \"${PROVIDER_ID}\",
+            \"provider_model_id\": \"${LLM_MODEL}\",
+            \"model_type\": \"llm\"
+          }")
+        echo "Registration response: $REG_RESPONSE"
+
+        if echo "$REG_RESPONSE" | jq -e '.model_id // .id' > /dev/null 2>&1; then
+          echo "✓ Model '${LLM_MODEL}' registered successfully"
+        else
+          echo "Model registration did not confirm — proceeding anyway"
+        fi
+
     - name: Verify Llemulator via LLM Proxy
       shell: bash
       env:
         HUB_URL: ${{ steps.wait_ingress.outputs.hub_url }}
         ADMIN_PASSWORD: ${{ inputs.admin_password }}
         NAMESPACE: ${{ inputs.namespace }}
+        LLM_MODEL: ${{ inputs.llm_model }}
       run: |
         echo "=== Testing llemulator access through Hub LLM proxy ==="
 
@@ -294,7 +355,7 @@ runs:
           "${HUB_URL}/hub/services/llm-proxy/v1/chat/completions" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${HUB_TOKEN}" \
-          -d '{"model": "gpt-4o", "messages": [{"role": "user", "content": "test via proxy"}]}')
+          -d "{\"model\": \"${LLM_MODEL}\", \"messages\": [{\"role\": \"user\", \"content\": \"test via proxy\"}]}")
 
         echo "LLM Proxy response: $RESPONSE"
 
